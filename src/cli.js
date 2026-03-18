@@ -7,6 +7,8 @@ import { scrapeCity } from './lib/maps.js';
 import { enrichListings } from './lib/website-enricher.js';
 import { splitCities, timestampLabel } from './lib/utils.js';
 
+const ALLOWED_BROWSER_CHANNELS = new Set(['auto', 'msedge', 'chrome', 'chromium']);
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 
@@ -118,7 +120,7 @@ function parseArgs(argv) {
         index += 1;
         break;
       case '--browser-channel':
-        options.browserChannel = expectValue(argv, index, arg);
+        options.browserChannel = parseBrowserChannel(expectValue(argv, index, arg), arg);
         index += 1;
         break;
       case '--query-prefix':
@@ -169,6 +171,17 @@ function parseInteger(value, flagName) {
   return parsed;
 }
 
+function parseBrowserChannel(value, flagName) {
+  const normalizedValue = value.trim().toLowerCase();
+  if (!ALLOWED_BROWSER_CHANNELS.has(normalizedValue)) {
+    throw new Error(
+      `Expected one of ${Array.from(ALLOWED_BROWSER_CHANNELS).join(', ')} for ${flagName}, got "${value}"`,
+    );
+  }
+
+  return normalizedValue;
+}
+
 function printHelp() {
   console.log(`
 KekaScraper
@@ -181,10 +194,10 @@ Options:
   --city "Barcelona"       Repeatable city flag
   --limit 20               Max result rows per city
   --formats json,csv       Output formats
-  --headful                Run Edge with UI visible
+  --headful                Run the browser with UI visible
   --slow-mo 250            Slow down Playwright actions
   --max-scroll-rounds 12   Scroll attempts for result list
-  --browser-channel msedge Playwright browser channel
+  --browser-channel auto|msedge|chrome|chromium  Select browser channel or bundled Chromium
   --query-prefix "hostels in"
   --enrich                 Enrich from the official website
   --no-enrich              Skip website enrichment

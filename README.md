@@ -42,10 +42,14 @@ Reusable Node.js + Playwright scraper for Google Maps hostel searches by city.
 
 ## Requirements
 
-- Windows
+- Windows, macOS, or Linux
 - Node.js 22+
-- Microsoft Edge installed
 - Playwright installed in this project
+- One supported Chromium-based browser available:
+  - preferred: Microsoft Edge
+  - fallback: Google Chrome
+  - last fallback: Playwright bundled Chromium
+  - Linux is expected to use Playwright bundled Chromium unless you install a supported browser channel
 
 ## Usage
 
@@ -85,10 +89,10 @@ npm run scrape -- --cities "Barcelona" --headful
 - `--city "Barcelona"` Repeatable single-city flag
 - `--limit 20` Max results per city
 - `--formats json,csv` Output formats
-- `--headful` Launch Edge with UI
+- `--headful` Launch the browser with UI
 - `--slow-mo 250` Slow down actions for debugging
 - `--max-scroll-rounds 12` Max scroll rounds on results panel
-- `--browser-channel msedge` Browser channel to use
+- `--browser-channel auto|msedge|chrome|chromium` Browser channel to use, or bundled Chromium
 - `--enrich` Enable website enrichment
 - `--no-enrich` Disable website enrichment
 - `--website-page-limit 8` Max same-domain pages to scan per website
@@ -96,6 +100,7 @@ npm run scrape -- --cities "Barcelona" --headful
 ## Notes and limits
 
 - Google Maps DOM changes regularly. Selectors for category, reviews, address, and website are pragmatic fallbacks and may need adjustments over time.
+- Browser launch is cross-platform. By default the scraper tries Edge first, then Chrome, then bundled Chromium. On Linux, the most portable setup is usually Playwright bundled Chromium. You can still force a browser with `--browser-channel`.
 - Some listings do not expose phone, website, or category publicly.
 - Hostel filtering is heuristic and based on listing name, category, and URL signals. It reduces hotel noise, but it is not perfect.
 - Website enrichment only uses public pages from the property website. It does not rely on LinkedIn or paid APIs.
