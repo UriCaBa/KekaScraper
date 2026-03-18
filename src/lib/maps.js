@@ -1,4 +1,5 @@
 import { firstNonEmpty, parseRatingAndReviews, retry, sleep, stripFieldPrefix } from './utils.js';
+import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
 
 const LISTING_LINK_SELECTOR = 'a[href*="/maps/place/"], a[href*="/place/"]';
 const HOSTEL_HINT_REGEX = /\b(hostel|hostels|albergue|alberg|youth hostel|backpacker)\b/i;
@@ -13,34 +14,76 @@ export async function scrapeCity(page, detailPage, options) {
     retryCount,
     retryDelayMs,
     detailPauseMs,
+    onEvent,
   } = options;
+  const emit = typeof onEvent === 'function' ? onEvent : () => {};
 
   const searchQuery = `${queryPrefix} ${city}`;
-  console.log(`\n[city] ${city}`);
-  console.log(`[search] ${searchQuery}`);
+  emitRunEvent(emit, RUN_EVENT_TYPES.CITY_SEARCH_STARTED, {
+    city,
+    searchQuery,
+  });
 
   await retry(
     () => openSearchResults(page, searchQuery),
-    { retries: retryCount, delayMs: retryDelayMs, label: `open results for ${city}` },
+    {
+      retries: retryCount,
+      delayMs: retryDelayMs,
+      label: `open results for ${city}`,
+      onEvent: emit,
+      eventContext: {
+        city,
+        searchQuery,
+      },
+    },
   );
 
   const candidateLimit = Math.min(Math.max(resultLimit * 4, resultLimit + 8), 80);
   const listingUrls = await collectListingUrls(page, { resultLimit, maxScrollRounds });
-  console.log(`[results] Found ${listingUrls.length} candidate URLs`);
+  emitRunEvent(emit, RUN_EVENT_TYPES.CITY_SEARCH_RESULTS, {
+    city,
+    searchQuery,
+    candidateCount: listingUrls.length,
+    candidateLimit,
+  });
 
   const results = [];
   const candidateUrls = listingUrls.slice(0, candidateLimit);
 
   for (const [index, listingUrl] of candidateUrls.entries()) {
+    emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_STARTED, {
+      city,
+      index: index + 1,
+      totalListings: candidateUrls.length,
+      listingUrl,
+    });
+
     try {
-      console.log(`[detail] ${index + 1}/${candidateUrls.length} ${listingUrl}`);
       const item = await retry(
         () => extractListing(detailPage, listingUrl, city, searchQuery),
-        { retries: retryCount, delayMs: retryDelayMs, label: `extract listing ${index + 1}` },
+        {
+          retries: retryCount,
+          delayMs: retryDelayMs,
+          label: `extract listing ${index + 1}`,
+          onEvent: emit,
+          eventContext: {
+            city,
+            index: index + 1,
+            totalListings: candidateUrls.length,
+            listingUrl,
+          },
+        },
       );
 
       if (!isLikelyHostel(item)) {
-        console.log(`[skip] Non-hostel result filtered out: ${item.name ?? listingUrl}`);
+        emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_SKIPPED, {
+          city,
+          index: index + 1,
+          totalListings: candidateUrls.length,
+          listingUrl,
+          name: item.name ?? null,
+          reason: 'non-hostel',
+        });
         await sleep(detailPauseMs);
         continue;
       }
@@ -52,7 +95,13 @@ export async function scrapeCity(page, detailPage, options) {
         break;
       }
     } catch (error) {
-      console.warn(`[warn] Failed to extract ${listingUrl}: ${error.message}`);
+      emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_FAILED, {
+        city,
+        index: index + 1,
+        totalListings: candidateUrls.length,
+        listingUrl,
+        message: error.message,
+      });
     }
   }
 

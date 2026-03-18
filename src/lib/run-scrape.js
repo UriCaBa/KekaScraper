@@ -3,12 +3,13 @@ import { defaultConfig } from '../config.js';
 import { launchBrowser } from './browser.js';
 import { writeOutputs } from './exporters.js';
 import { scrapeCity } from './maps.js';
+import { createRunEmitter, emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
 import { enrichListings } from './website-enricher.js';
 import { normalizeRunOptions } from './run-options.js';
 import { timestampLabel } from './utils.js';
 
 export async function runScrape(inputOptions = {}, hooks = {}) {
-  const emit = createEmitter(hooks.onEvent);
+  const emit = createRunEmitter(hooks.onEvent);
   const startedAt = new Date();
   const runConfig = normalizeRunOptions(inputOptions, { requireCities: true });
   const outputDir = normalizeOutputDir(runConfig.outputDir);
@@ -17,16 +18,14 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     outputDir,
   };
 
-  emit({
-    type: 'run-started',
+  emitRunEvent(emit, RUN_EVENT_TYPES.RUN_STARTED, {
     startedAt: startedAt.toISOString(),
     cities: normalizedRunConfig.cities,
     outputDirectory: outputDir,
   });
 
   const { browser, context, launchSummary } = await launchBrowser(normalizedRunConfig);
-  emit({
-    type: 'browser-ready',
+  emitRunEvent(emit, RUN_EVENT_TYPES.BROWSER_READY, {
     requestedBrowserChannel: normalizedRunConfig.browserChannel,
     selectedBrowserLabel: launchSummary.selectedCandidateLabel,
   });
@@ -39,8 +38,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     const detailPage = await context.newPage();
 
     for (const [index, city] of normalizedRunConfig.cities.entries()) {
-      emit({
-        type: 'city-started',
+      emitRunEvent(emit, RUN_EVENT_TYPES.CITY_STARTED, {
         city,
         index: index + 1,
         totalCities: normalizedRunConfig.cities.length,
@@ -55,11 +53,11 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
           retryCount: normalizedRunConfig.retryCount,
           retryDelayMs: normalizedRunConfig.retryDelayMs,
           detailPauseMs: normalizedRunConfig.detailPauseMs,
+          onEvent: emit,
         });
 
         allResults.push(...cityResults);
-        emit({
-          type: 'city-completed',
+        emitRunEvent(emit, RUN_EVENT_TYPES.CITY_COMPLETED, {
           city,
           index: index + 1,
           totalCities: normalizedRunConfig.cities.length,
@@ -68,8 +66,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
         });
       } catch (error) {
         cityFailures += 1;
-        emit({
-          type: 'city-failed',
+        emitRunEvent(emit, RUN_EVENT_TYPES.CITY_FAILED, {
           city,
           index: index + 1,
           totalCities: normalizedRunConfig.cities.length,
@@ -86,8 +83,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
 
   let finalResults = allResults;
   if (normalizedRunConfig.enrichWebsite) {
-    emit({
-      type: 'enrichment-started',
+    emitRunEvent(emit, RUN_EVENT_TYPES.ENRICHMENT_STARTED, {
       totalListings: allResults.length,
     });
 
@@ -115,8 +111,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     launchSummary,
   });
 
-  emit({
-    type: 'run-completed',
+  emitRunEvent(emit, RUN_EVENT_TYPES.RUN_COMPLETED, {
     summary,
   });
 
@@ -125,23 +120,6 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     summary,
     results: finalResults,
     outputFiles,
-  };
-}
-
-function createEmitter(onEvent) {
-  if (typeof onEvent !== 'function') {
-    return () => {};
-  }
-
-  return (event) => {
-    try {
-      onEvent({
-        ...event,
-        timestamp: new Date().toISOString(),
-      });
-    } catch {
-      // Ignore observer errors so the scraper can continue.
-    }
   };
 }
 

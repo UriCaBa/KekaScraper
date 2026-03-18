@@ -96,10 +96,13 @@ This project is intentionally local-first:
 - Keep friendly browser labels complete for every supported channel, including fallback cases such as `Chromium`, instead of formatting only the most common ones.
 - If browser availability depends on runtime config, keep launch errors configuration-aware. Do not hardcode a packaged-build explanation when the real reason is simply that bundled Chromium was disabled.
 - Shared engine and library layers should not write directly to stdout/stderr for routine progress. Surface progress and warnings through hooks/events so each surface decides what to render.
+- Keep browser-safe normalization helpers in a shared pure module when both Electron renderer and Node layers need the same parsing rules. Do not maintain near-duplicate city or URL parsers in `src/ui/` and `src/lib/`.
+- Centralize shared event names in one module and import those constants from the producer and every consumer. Do not scatter raw event strings across CLI, renderer, and engine code.
 - When a surface consumes shared engine events, keep the renderer/CLI handler aligned with the event payload contract and smoke-test the path after renaming payload fields.
 - If the shared engine stamps event metadata such as `timestamp`, set that metadata after spreading caller-provided fields so upstream payloads cannot overwrite it accidentally.
 - UI labels for progress counters must match the actual semantics of the underlying state. If failures are counted too, prefer wording such as `processed` over `completed`.
 - Do not send full large result sets over Electron IPC just to render a preview. Return a bounded preview slice plus summary/output paths, and let exports remain the full source of truth.
+- Keep default option values such as output formats in shared config, not as separate hardcoded defaults per surface, so CLI, desktop, and tests evolve together.
 
 ## Packaging Guardrails
 
@@ -116,6 +119,8 @@ This project is intentionally local-first:
 Before finishing substantial changes, validate what is practical from the current environment:
 
 - `node src/cli.js --help`
+- `node . --help`
+- `npm run verify:contracts`
 - a real CLI smoke run for at least one city when scraping behavior changes
 - `npm.cmd start` or equivalent Electron startup smoke test when desktop code changes
 - packaging checks when build configuration changes

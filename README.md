@@ -38,8 +38,10 @@ Reusable local scraper for Google Maps hostel searches by city, with both a CLI 
   - `lastSeenAt`
   - `roomCount`
   - `bedCount`
-- Writes output to `output/` as JSON and optional CSV
-- Includes a local Electron desktop app for non-technical users on Windows and macOS
+- Writes output locally:
+  - CLI runs default to JSON in `output/`
+  - the desktop app writes to your Documents folder under `KekaScraper/output`
+- Includes a local Electron desktop app for non-technical users targeting Windows and macOS
 
 ## Requirements
 
@@ -74,6 +76,7 @@ npm run dist
 ```
 
 The desktop app stores exported results in your Documents folder under `KekaScraper/output` and remembers the last basic settings locally on the same machine.
+It defaults to JSON output to match the CLI. Enable CSV explicitly in the form when you need it.
 Current packaged desktop builds are configured around system browsers. For the smoothest first-run experience on client machines, keep Microsoft Edge or Google Chrome installed and use `Auto`, `Microsoft Edge`, or `Google Chrome` in the app.
 
 ## CLI usage
@@ -128,6 +131,7 @@ npm run scrape -- --cities "Barcelona" --headful
 - Browser launch is cross-platform. By default the scraper tries Edge first, then Chrome, then bundled Chromium. On Linux, the most portable setup is usually Playwright bundled Chromium. You can still force a browser with `--browser-channel`.
 - Packaged desktop builds currently use system browsers only. The CLI and unpackaged local development runs can still use Playwright bundled Chromium.
 - The desktop app is fully local. It does not call any external KekaScraper API or cloud backend.
+- Windows packaging is validated from the current development environment. macOS remains a target, but it is not considered validated until the app is built on macOS or on a macOS runner.
 - Some listings do not expose phone, website, or category publicly.
 - Hostel filtering is heuristic and based on listing name, category, and URL signals. It reduces hotel noise, but it is not perfect.
 - Website enrichment only uses public pages from the property website. It does not rely on LinkedIn or paid APIs.

@@ -7,6 +7,7 @@ const rootDir = path.resolve(currentDir, '..');
 
 export const defaultConfig = {
   browserChannel: 'auto',
+  formats: ['json'],
   headless: true,
   slowMo: 0,
   locale: 'en-US',

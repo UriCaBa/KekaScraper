@@ -28,3 +28,9 @@ jobs:
 
       - name: Validate CLI loads
         run: node src/cli.js --help
+
+      - name: Validate package entry loads
+        run: node . --help
+
+      - name: Validate shared contracts
+        run: npm run verify:contracts

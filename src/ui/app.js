@@ -1,3 +1,6 @@
+import { RUN_EVENT_TYPES } from '../lib/run-events.js';
+import { countUniqueCities, normalizePublicUrl } from '../shared/input-normalization.js';
+
 const state = {
   initialized: false,
   outputDirectory: '',
@@ -13,8 +16,6 @@ const state = {
 };
 
 const RESULTS_PREVIEW_LIMIT = 200;
-const INVALID_URL_HOST_TOKENS = new Set(['-', '--', 'n/a', 'na', 'nil', 'none', 'null', 'undefined', 'unknown']);
-const PUBLIC_HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 
 const elements = {
   form: document.querySelector('#scrape-form'),
@@ -143,22 +144,28 @@ async function handleSubmit() {
 
 function handleScrapeEvent(event) {
   switch (event.type) {
-    case 'run-started':
+    case RUN_EVENT_TYPES.RUN_STARTED:
       state.totalCities = event.cities.length;
       elements.statusPhase.textContent = 'Launching';
       elements.statusCopy.textContent = `Starting a local scrape. Files will be written to ${event.outputDirectory}.`;
       appendLog(`Starting local scrape. Output folder: ${event.outputDirectory}`);
       break;
-    case 'browser-ready':
+    case RUN_EVENT_TYPES.BROWSER_READY:
       elements.statusPhase.textContent = 'Scraping';
       appendLog(`Browser ready: ${event.selectedBrowserLabel} (requested: ${event.requestedBrowserChannel}).`);
       break;
-    case 'city-started':
+    case RUN_EVENT_TYPES.CITY_STARTED:
       elements.statusPhase.textContent = 'Scraping';
       elements.statusCopy.textContent = `Searching Google Maps for ${event.city}.`;
       appendLog(`City ${event.index}/${event.totalCities}: ${event.city}`);
       break;
-    case 'city-completed':
+    case RUN_EVENT_TYPES.CITY_SEARCH_RESULTS:
+      appendLog(`${event.city}: found ${event.candidateCount} candidate Google Maps URLs.`);
+      break;
+    case RUN_EVENT_TYPES.RETRYING:
+      appendLog(`Retrying ${event.label}: ${event.message}`, 'error');
+      break;
+    case RUN_EVENT_TYPES.CITY_COMPLETED:
       state.completedCities = event.index;
       state.totalResults = event.totalResultCount;
       elements.statusCopy.textContent = `${event.city} completed with ${event.cityResultCount} matches.`;
@@ -166,26 +173,35 @@ function handleScrapeEvent(event) {
         `${event.city} completed. ${event.cityResultCount} matches kept, ${event.totalResultCount} total so far.`,
       );
       break;
-    case 'city-failed':
+    case RUN_EVENT_TYPES.LISTING_FAILED:
+      appendLog(`Listing failed for ${event.city}: ${event.message}`, 'error');
+      break;
+    case RUN_EVENT_TYPES.CITY_FAILED:
       state.completedCities = event.index;
       appendLog(`${event.city} failed: ${event.message}`, 'error');
       elements.statusCopy.textContent = `${event.city} failed, but the run is continuing.`;
       break;
-    case 'enrichment-started':
+    case RUN_EVENT_TYPES.ENRICHMENT_STARTED:
       elements.statusPhase.textContent = 'Enriching';
       elements.statusCopy.textContent = `Checking ${event.totalListings} hostel websites for public contact details.`;
       appendLog(`Starting website enrichment for ${event.totalListings} listings.`);
       break;
-    case 'enrichment-item-started':
+    case RUN_EVENT_TYPES.ENRICHMENT_ITEM_STARTED:
       appendLog(`Enriching ${event.index}/${event.totalListings}: ${event.name ?? event.website ?? 'listing'}.`);
       break;
-    case 'enrichment-item-completed':
+    case RUN_EVENT_TYPES.ENRICHMENT_ITEM_SKIPPED:
+      appendLog(`Skipping website enrichment for ${event.name ?? event.website ?? 'listing'} (${event.reason}).`);
+      break;
+    case RUN_EVENT_TYPES.ENRICHMENT_ITEM_COMPLETED:
       appendLog(`Website enrichment finished for ${event.name ?? event.website ?? 'listing'}.`);
       break;
-    case 'enrichment-item-failed':
+    case RUN_EVENT_TYPES.ENRICHMENT_ITEM_FAILED:
       appendLog(`Website enrichment failed for ${event.name ?? event.website ?? 'listing'}: ${event.message}`, 'error');
       break;
-    case 'run-completed':
+    case RUN_EVENT_TYPES.WEBSITE_PAGE_SKIPPED:
+      appendLog(`Skipping subpage ${event.url}: ${event.message}`, 'error');
+      break;
+    case RUN_EVENT_TYPES.RUN_COMPLETED:
       state.totalResults = event.summary.totalResults;
       state.completedCities = event.summary.totalCities;
       elements.statusPhase.textContent = 'Completed';
@@ -339,7 +355,7 @@ function buildCompletionMessage(summary) {
 }
 
 function countCities(citiesText) {
-  return new Set(splitCityEntries(citiesText)).size;
+  return countUniqueCities(citiesText);
 }
 
 function formatDuration(durationMs) {
@@ -354,41 +370,7 @@ function formatDuration(durationMs) {
 }
 
 function sanitizeExternalUrl(value) {
-  const normalizedValue = normalizePotentialUrl(value);
-  if (!normalizedValue) {
-    return null;
-  }
-
-  try {
-    const parsed = new URL(normalizedValue);
-    if (
-      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
-      || !isLikelyPublicHostname(parsed.hostname)
-    ) {
-      return null;
-    }
-
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
-function normalizePotentialUrl(value) {
-  const trimmedValue = normalizeInputToken(value);
-  if (!trimmedValue) {
-    return '';
-  }
-
-  if (/^https?:\/\//i.test(trimmedValue)) {
-    return trimmedValue;
-  }
-
-  if (!isLikelyPublicHostname(trimmedValue)) {
-    return '';
-  }
-
-  return `https://${trimmedValue}`;
+  return normalizePublicUrl(value);
 }
 
 function syncFormatSelection() {
@@ -487,31 +469,4 @@ function createWebsiteCell(url) {
   });
   cell.append(button);
   return cell;
-}
-
-function normalizeInputToken(value) {
-  return `${value ?? ''}`.replace(/\s+/g, ' ').trim();
-}
-
-function isLikelyPublicHostname(value) {
-  const normalizedValue = normalizeInputToken(value).toLowerCase();
-  if (!normalizedValue) {
-    return false;
-  }
-
-  const hostname = normalizedValue
-    .split(/[/?#]/, 1)[0]
-    .replace(/:\d{1,5}$/, '');
-  if (!hostname || hostname.includes('@') || INVALID_URL_HOST_TOKENS.has(hostname)) {
-    return false;
-  }
-
-  return PUBLIC_HOSTNAME_PATTERN.test(hostname);
-}
-
-function splitCityEntries(value) {
-  return [`${value ?? ''}`]
-    .flatMap((entry) => entry.split(/[,\n;]+/))
-    .map((entry) => normalizeInputToken(entry))
-    .filter(Boolean);
 }

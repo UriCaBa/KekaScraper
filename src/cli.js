@@ -1,6 +1,7 @@
 import path from 'node:path';
 import process from 'node:process';
 import { normalizeBrowserChannel, normalizeInteger, normalizeRunOptions } from './lib/run-options.js';
+import { RUN_EVENT_TYPES } from './lib/run-events.js';
 import { runScrape } from './lib/run-scrape.js';
 import { splitCities } from './lib/utils.js';
 
@@ -28,16 +29,35 @@ async function main() {
 
 function handleCliEvent(event) {
   switch (event.type) {
-    case 'browser-ready':
+    case RUN_EVENT_TYPES.BROWSER_READY:
       console.log(`[browser] ${event.selectedBrowserLabel} (requested: ${event.requestedBrowserChannel})`);
       break;
-    case 'enrichment-started':
+    case RUN_EVENT_TYPES.CITY_SEARCH_STARTED:
+      console.log(`\n[city] ${event.city}`);
+      console.log(`[search] ${event.searchQuery}`);
+      break;
+    case RUN_EVENT_TYPES.CITY_SEARCH_RESULTS:
+      console.log(`[results] Found ${event.candidateCount} candidate URLs`);
+      break;
+    case RUN_EVENT_TYPES.RETRYING:
+      console.error(`[retry] ${event.label}: ${event.message}`);
+      break;
+    case RUN_EVENT_TYPES.LISTING_FAILED:
+      console.error(`[detail-failed] ${event.listingUrl}: ${event.message}`);
+      break;
+    case RUN_EVENT_TYPES.ENRICHMENT_STARTED:
       console.log(`[enrich] Starting website enrichment for ${event.totalListings} listings`);
       break;
-    case 'enrichment-item-failed':
+    case RUN_EVENT_TYPES.ENRICHMENT_ITEM_SKIPPED:
+      console.log(`[enrich-skip] ${describeEnrichmentTarget(event)} (${event.reason})`);
+      break;
+    case RUN_EVENT_TYPES.ENRICHMENT_ITEM_FAILED:
       console.error(`[enrich-failed] ${describeEnrichmentTarget(event)}: ${event.message}`);
       break;
-    case 'city-failed':
+    case RUN_EVENT_TYPES.WEBSITE_PAGE_SKIPPED:
+      console.error(`[website-skip] ${event.url}: ${event.message}`);
+      break;
+    case RUN_EVENT_TYPES.CITY_FAILED:
       console.error(`[city-failed] ${event.city}: ${event.message}`);
       break;
     default:
@@ -48,7 +68,6 @@ function handleCliEvent(event) {
 function parseArgs(argv) {
   const options = {
     cities: [],
-    formats: ['json'],
   };
 
   for (let index = 0; index < argv.length; index += 1) {

@@ -1,5 +1,6 @@
 import { defaultConfig } from '../config.js';
-import { normalizeWhitespace, splitCities } from './utils.js';
+import { normalizeWhitespace } from './utils.js';
+import { splitCityInput } from '../shared/input-normalization.js';
 
 export const ALLOWED_BROWSER_CHANNELS = ['auto', 'msedge', 'chrome', 'chromium'];
 export const ALLOWED_OUTPUT_FORMATS = ['json', 'csv'];
@@ -80,20 +81,22 @@ export function normalizeBoolean(value, defaultValue) {
 
 export function normalizeFormats(value) {
   if (value === undefined || value === null) {
-    return ['json'];
+    return [...defaultConfig.formats];
   }
 
-  const items = Array.isArray(value) ? value : splitCities([`${value}`]);
+  const items = splitCityInput(Array.isArray(value) ? value : [`${value}`]);
   const normalized = [...new Set(
     items
       .map((item) => `${item}`.trim().toLowerCase())
       .filter((item) => ALLOWED_OUTPUT_FORMATS.includes(item)),
   )];
 
-  return normalized.length ? normalized : ['json'];
+  return normalized.length ? normalized : [...defaultConfig.formats];
 }
 
 function normalizeCities(value) {
-  const items = Array.isArray(value) ? value : (value ? splitCities([`${value}`]) : []);
+  const items = value === undefined || value === null
+    ? []
+    : splitCityInput(Array.isArray(value) ? value : [`${value}`]);
   return [...new Set(items.map((item) => normalizeWhitespace(String(item))).filter(Boolean))];
 }

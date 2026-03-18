@@ -1,7 +1,6 @@
 import fs from 'node:fs/promises';
-
-const INVALID_URL_HOST_TOKENS = new Set(['-', '--', 'n/a', 'na', 'nil', 'none', 'null', 'undefined', 'unknown']);
-const PUBLIC_HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
+import { isLikelyPublicHostname, normalizePotentialUrl as normalizeSharedPotentialUrl, splitCityInput } from '../shared/input-normalization.js';
 
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -12,6 +11,8 @@ export async function retry(task, options = {}) {
     retries = 2,
     delayMs = 1000,
     label = 'operation',
+    onEvent,
+    eventContext = {},
   } = options;
 
   let lastError;
@@ -26,7 +27,13 @@ export async function retry(task, options = {}) {
         break;
       }
 
-      console.warn(`[retry] ${label} failed on attempt ${attempt}. Retrying...`);
+      emitRunEvent(onEvent ?? (() => {}), RUN_EVENT_TYPES.RETRYING, {
+        ...eventContext,
+        label,
+        attempt,
+        retries,
+        message: error.message,
+      });
       await sleep(delayMs);
     }
   }
@@ -169,8 +176,7 @@ export function timestampLabel(date = new Date()) {
 }
 
 export function splitCities(rawValues) {
-  return rawValues
-    .flatMap((value) => String(value).split(/[,\n;]+/))
+  return splitCityInput(rawValues)
     .map((city) => normalizeWhitespace(city))
     .filter(Boolean);
 }
@@ -181,7 +187,7 @@ export function normalizeUrl(value) {
   }
 
   try {
-    const normalizedValue = normalizePotentialUrl(value);
+    const normalizedValue = normalizeSharedPotentialUrl(value);
     if (!normalizedValue) {
       return null;
     }
@@ -202,39 +208,6 @@ export function normalizeUrl(value) {
 
 export function uniqueNonEmpty(values) {
   return [...new Set(values.map((value) => normalizeWhitespace(String(value))).filter(Boolean))];
-}
-
-function normalizePotentialUrl(value) {
-  const trimmedValue = normalizeWhitespace(String(value));
-  if (!trimmedValue) {
-    return '';
-  }
-
-  if (/^https?:\/\//i.test(trimmedValue)) {
-    return trimmedValue;
-  }
-
-  if (!isLikelyPublicHostname(trimmedValue)) {
-    return '';
-  }
-
-  return `https://${trimmedValue}`;
-}
-
-function isLikelyPublicHostname(value) {
-  const normalizedValue = normalizeWhitespace(String(value)).toLowerCase();
-  if (!normalizedValue) {
-    return false;
-  }
-
-  const hostname = normalizedValue
-    .split(/[/?#]/, 1)[0]
-    .replace(/:\d{1,5}$/, '');
-  if (!hostname || hostname.includes('@') || INVALID_URL_HOST_TOKENS.has(hostname)) {
-    return false;
-  }
-
-  return PUBLIC_HOSTNAME_PATTERN.test(hostname);
 }
 
 function repairMojibake(value) {

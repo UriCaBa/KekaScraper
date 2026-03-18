@@ -147,7 +147,7 @@ function getDefaultFormState() {
   return {
     citiesText: '',
     resultLimit: defaultConfig.resultLimit,
-    formats: ['json', 'csv'],
+    formats: [...defaultConfig.formats],
     browserChannel: defaultConfig.browserChannel,
     headful: !defaultConfig.headless,
     enrichWebsite: defaultConfig.enrichWebsite,

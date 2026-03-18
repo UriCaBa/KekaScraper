@@ -9,6 +9,7 @@
     "dev": "electron src/electron/main.js",
     "scrape": "node src/cli.js",
     "smoke": "node src/cli.js --cities \"Barcelona\" --limit 3 --formats json,csv",
+    "verify:contracts": "node scripts/verify-contracts.mjs",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
