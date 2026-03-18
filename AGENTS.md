@@ -46,6 +46,25 @@ This project is intentionally local-first:
 - Treat Linux support as best-effort for the CLI unless product requirements change.
 - Do not silently remove CLI flags or change output field names without updating docs.
 
+## Defensive Defaults
+
+- Do not trust renderer input in Electron. Validate URLs, file paths, and user-provided values again in the main process.
+- Keep Electron secure by default: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, and deny unexpected navigations or new windows.
+- Open external links only through a safe main-process bridge and only for `http` / `https` URLs.
+- Validate local file access against the allowed output directory in the main process, using canonical paths where the boundary matters.
+- Create required output directories before opening or writing to them instead of assuming they already exist.
+- Put browser, context, and page lifecycle under `try` / `finally` so Playwright resources are always cleaned up.
+- Cleanup code must not mask successful scrape results. Use tolerant teardown patterns such as `Promise.allSettled(...)` or guarded closes.
+- Validate parsed form state before flipping the desktop UI into a running or disabled state.
+- Keep frontend constraints aligned with backend behavior. If the backend requires at least one format or one valid city, the UI must enforce the same rule explicitly.
+
+## Packaging Guardrails
+
+- Keep packaged-app behavior aligned with what is actually shipped, not with local development assumptions.
+- Do not expose bundled Chromium in packaged desktop builds unless the build explicitly ships a runnable Playwright browser payload.
+- If packaging constraints force a narrower runtime contract, reflect that in the UI, runtime validation, and README at the same time.
+- Do not claim macOS packaging is validated unless it has been built on macOS or on a macOS CI runner.
+
 ## Validation Expectations
 
 Before finishing substantial changes, validate what is practical from the current environment:
