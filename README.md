@@ -49,7 +49,8 @@ Reusable local scraper for Google Maps hostel searches by city, with both a CLI 
 - One supported Chromium-based browser available:
   - preferred: Microsoft Edge
   - fallback: Google Chrome
-  - last fallback: Playwright bundled Chromium
+  - CLI and local development can also use Playwright bundled Chromium
+  - packaged desktop builds currently expect Edge or Chrome to be installed on the machine
   - Linux is expected to use Playwright bundled Chromium unless you install a supported browser channel
 
 ## Desktop app
@@ -73,6 +74,7 @@ npm run dist
 ```
 
 The desktop app stores exported results in your Documents folder under `KekaScraper/output` and remembers the last basic settings locally on the same machine.
+Current packaged desktop builds are configured around system browsers. For the smoothest first-run experience on client machines, keep Microsoft Edge or Google Chrome installed and use `Auto`, `Microsoft Edge`, or `Google Chrome` in the app.
 
 ## CLI usage
 
@@ -124,6 +126,7 @@ npm run scrape -- --cities "Barcelona" --headful
 
 - Google Maps DOM changes regularly. Selectors for category, reviews, address, and website are pragmatic fallbacks and may need adjustments over time.
 - Browser launch is cross-platform. By default the scraper tries Edge first, then Chrome, then bundled Chromium. On Linux, the most portable setup is usually Playwright bundled Chromium. You can still force a browser with `--browser-channel`.
+- Packaged desktop builds currently use system browsers only. The CLI and unpackaged local development runs can still use Playwright bundled Chromium.
 - The desktop app is fully local. It does not call any external KekaScraper API or cloud backend.
 - Some listings do not expose phone, website, or category publicly.
 - Hostel filtering is heuristic and based on listing name, category, and URL signals. It reduces hotel noise, but it is not perfect.

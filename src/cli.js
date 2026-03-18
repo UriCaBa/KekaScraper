@@ -5,14 +5,13 @@ import { runScrape } from './lib/run-scrape.js';
 import { splitCities } from './lib/utils.js';
 
 async function main() {
-  const parsedArgs = parseArgs(process.argv.slice(2));
+  const runConfig = parseArgs(process.argv.slice(2));
 
-  if (parsedArgs.help || parsedArgs.cities.length === 0) {
+  if (runConfig.help || runConfig.cities.length === 0) {
     printHelp();
-    process.exit(parsedArgs.help ? 0 : 1);
+    process.exit(runConfig.help ? 0 : 1);
   }
 
-  const runConfig = normalizeRunOptions(parsedArgs);
   const { summary, outputFiles } = await runScrape(runConfig);
 
   console.log(`\n[done] Extracted ${summary.totalResults} rows across ${summary.totalCities} cities`);

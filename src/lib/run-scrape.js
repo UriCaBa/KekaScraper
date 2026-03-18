@@ -25,12 +25,13 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     selectedBrowserLabel: launchSummary.selectedCandidateLabel,
   });
 
-  const page = await context.newPage();
-  const detailPage = await context.newPage();
   const allResults = [];
   let cityFailures = 0;
 
   try {
+    const page = await context.newPage();
+    const detailPage = await context.newPage();
+
     for (const [index, city] of runConfig.cities.entries()) {
       emit({
         type: 'city-started',

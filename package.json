@@ -30,7 +30,7 @@
   "build": {
     "appId": "com.uricaba.kekascraper",
     "productName": "KekaScraper",
-    "asar": true,
+    "asar": false,
     "directories": {
       "output": "release"
     },

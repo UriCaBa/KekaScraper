@@ -15,6 +15,7 @@ const elements = {
   resultLimit: document.querySelector('#result-limit'),
   websitePageLimit: document.querySelector('#website-page-limit'),
   browserChannel: document.querySelector('#browser-channel'),
+  browserChannelHelp: document.querySelector('#browser-channel-help'),
   enrichWebsite: document.querySelector('#enrich-website'),
   headful: document.querySelector('#headful'),
   formatCheckboxes: [...document.querySelectorAll('input[name="formats"]')],
@@ -43,10 +44,12 @@ bootstrap().catch((error) => {
 async function bootstrap() {
   const initialData = await window.kekaApp.getDefaults();
   state.outputDirectory = initialData.outputDirectory;
+  const initialFormState = { ...initialData.formState };
 
   elements.outputDirectory.textContent = initialData.outputDirectory;
   elements.appVersion.textContent = initialData.appVersion;
-  populateForm(initialData.formState);
+  configureBrowserOptions(initialData.supportsBundledChromium, initialFormState);
+  populateForm(initialFormState);
   renderResults();
   renderStatus();
 
@@ -245,6 +248,22 @@ function populateForm(formState) {
   }
 
   syncFormatSelection();
+}
+
+function configureBrowserOptions(supportsBundledChromium, formState) {
+  const chromiumOption = elements.browserChannel.querySelector('option[value="chromium"]');
+
+  if (!supportsBundledChromium && chromiumOption) {
+    chromiumOption.remove();
+    if (formState.browserChannel === 'chromium') {
+      formState.browserChannel = 'auto';
+    }
+
+    elements.browserChannelHelp.textContent = 'Packaged desktop builds currently use Auto, Edge, or Chrome.';
+    return;
+  }
+
+  elements.browserChannelHelp.textContent = 'Auto tries Edge, then Chrome, then bundled Chromium.';
 }
 
 function readFormState() {

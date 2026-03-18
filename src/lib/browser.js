@@ -8,12 +8,19 @@ export async function launchBrowser(options) {
     locale,
     navigationTimeoutMs,
     actionTimeoutMs,
+    allowBundledChromium = true,
   } = options;
 
   let browser;
   let launchError;
   let selectedLaunchCandidate;
-  const launchCandidates = getLaunchCandidates(browserChannel);
+  const launchCandidates = getLaunchCandidates(browserChannel, { allowBundledChromium });
+
+  if (launchCandidates.length === 0) {
+    throw new Error(
+      'Bundled Chromium is not available in packaged desktop builds. Use Auto, Microsoft Edge, or Google Chrome.',
+    );
+  }
 
   for (const candidate of launchCandidates) {
     try {
@@ -64,8 +71,12 @@ export async function launchBrowser(options) {
   }
 }
 
-function getLaunchCandidates(browserChannel) {
+function getLaunchCandidates(browserChannel, { allowBundledChromium = true } = {}) {
   if (browserChannel && browserChannel !== 'auto') {
+    if (browserChannel === 'chromium' && !allowBundledChromium) {
+      return [];
+    }
+
     return [makeChannelCandidate(browserChannel)];
   }
 
@@ -73,7 +84,7 @@ function getLaunchCandidates(browserChannel) {
 
   return [
     ...autoFallbackChannels.map((channel) => makeChannelCandidate(channel)),
-    makeBundledChromiumCandidate(),
+    ...(allowBundledChromium ? [makeBundledChromiumCandidate()] : []),
   ];
 }
 

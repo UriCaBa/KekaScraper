@@ -1,6 +1,6 @@
 import path from 'node:path';
 import process from 'node:process';
-import { realpath } from 'node:fs/promises';
+import { mkdir, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { defaultConfig } from '../config.js';
@@ -76,6 +76,7 @@ function registerIpcHandlers() {
     return {
       formState: initialFormState,
       outputDirectory: getDesktopOutputDirectory(),
+      supportsBundledChromium: !app.isPackaged,
       appVersion: app.getVersion(),
     };
   });
@@ -118,6 +119,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('scrape:open-output-folder', async () => {
+    await mkdir(getDesktopOutputDirectory(), { recursive: true });
     return shell.openPath(getDesktopOutputDirectory());
   });
 
@@ -145,18 +147,24 @@ function getDefaultFormState() {
 function normalizeFormState(rawFormState = {}) {
   const citiesText = `${rawFormState.citiesText ?? ''}`.trim();
   const formats = normalizeFormats(rawFormState.formats);
+  const browserChannel = normalizeBrowserChannel(
+    rawFormState.browserChannel ?? defaultConfig.browserChannel,
+    'browser channel',
+  );
+
   if (!citiesText) {
     throw new Error('Add at least one city before starting the scrape.');
+  }
+
+  if (app.isPackaged && browserChannel === 'chromium') {
+    throw new Error('Packaged desktop builds currently require Auto, Microsoft Edge, or Google Chrome.');
   }
 
   return {
     citiesText,
     resultLimit: normalizeInteger(rawFormState.resultLimit, defaultConfig.resultLimit, 'resultLimit'),
     formats,
-    browserChannel: normalizeBrowserChannel(
-      rawFormState.browserChannel ?? defaultConfig.browserChannel,
-      'browser channel',
-    ),
+    browserChannel,
     headful: Boolean(rawFormState.headful),
     enrichWebsite: rawFormState.enrichWebsite !== false,
     websitePageLimit: normalizeInteger(
@@ -177,6 +185,7 @@ function buildRunConfig(formState) {
     enrichWebsite: formState.enrichWebsite,
     websitePageLimit: formState.websitePageLimit,
     outputDir: getDesktopOutputDirectory(),
+    allowBundledChromium: !app.isPackaged,
   };
 }
 
