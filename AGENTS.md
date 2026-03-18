@@ -57,16 +57,21 @@ This project is intentionally local-first:
 - Treat `shell.openPath()` as fallible. Check its returned error string and convert failures into explicit errors instead of assuming success.
 - Put browser, context, and page lifecycle under `try` / `finally` so Playwright resources are always cleaned up.
 - Cleanup code must not mask successful scrape results. Use tolerant teardown patterns such as `Promise.allSettled(...)` or guarded closes.
+- Prevent default form submission synchronously during renderer bootstrap. Do not wait for async defaults before attaching the submit guard.
 - Validate parsed form state before flipping the desktop UI into a running or disabled state.
 - Keep frontend constraints aligned with backend behavior. If the backend requires at least one format or one valid city, the UI must enforce the same rule explicitly.
 - When a UI temporarily disables inputs during a run, restore any dynamic validation or checkbox guards when the form becomes interactive again.
 - Do not let follow-up UI helpers accidentally re-enable controls that were intentionally disabled for a running job.
+- Normalize persisted preferences before hydrating the UI. Treat the local preferences file as untrusted input and fall back field-by-field.
 - Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
+- Do not promote placeholder tokens such as `null`, `undefined`, or `n/a` into public URLs. Scheme-less URL normalization should require a plausible hostname.
 - When the UI shows derived counts for cities or rows, use the same normalization rules as the backend so progress copy and final results stay consistent.
 - If the renderer cannot import a backend helper directly, mirror the backend parsing logic in a small, clearly named helper instead of open-coding a “close enough” variant.
 - Validate critical renderer inputs again in Electron main using the same parsing rules as the shared backend, not just simple non-empty string checks.
 - Keep URL normalization consistent across display and enrichment paths. If scheme-less hostnames are accepted in the UI, the backend should normalize them too.
 - Avoid `innerHTML` for interactive controls that carry real data in attributes. Prefer DOM creation with `textContent`, closures, or `dataset` set via DOM APIs.
+- Final desktop UI state should reconcile from the returned scrape summary, not rely exclusively on streamed IPC progress events.
+- Distinguish “no run yet” from “run completed with 0 rows” in the results area so exported files remain accessible after empty runs.
 - Separate path containment checks from file-existence checks so missing files return accurate errors instead of looking like boundary violations.
 
 ## Packaging Guardrails
@@ -75,6 +80,7 @@ This project is intentionally local-first:
 - Do not expose bundled Chromium in packaged desktop builds unless the build explicitly ships a runnable Playwright browser payload.
 - If packaging constraints force a narrower runtime contract, reflect that in the UI, runtime validation, and README at the same time.
 - Do not over-constrain `electron-builder` packaged files in a way that drops production dependencies such as `node_modules`.
+- If packaged builds rely on system browsers, explicitly exclude Playwright's downloaded browser payload from release artifacts instead of relying on whatever happens to exist locally.
 - Do not claim macOS packaging is validated unless it has been built on macOS or on a macOS CI runner.
 
 ## Validation Expectations

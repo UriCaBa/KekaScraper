@@ -1,5 +1,8 @@
 import fs from 'node:fs/promises';
 
+const INVALID_URL_HOST_TOKENS = new Set(['-', '--', 'n/a', 'na', 'nil', 'none', 'null', 'undefined', 'unknown']);
+const PUBLIC_HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -178,8 +181,16 @@ export function normalizeUrl(value) {
   }
 
   try {
-    const parsed = new URL(normalizePotentialUrl(value));
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    const normalizedValue = normalizePotentialUrl(value);
+    if (!normalizedValue) {
+      return null;
+    }
+
+    const parsed = new URL(normalizedValue);
+    if (
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+      || !isLikelyPublicHostname(parsed.hostname)
+    ) {
       return null;
     }
 
@@ -203,7 +214,27 @@ function normalizePotentialUrl(value) {
     return trimmedValue;
   }
 
+  if (!isLikelyPublicHostname(trimmedValue)) {
+    return '';
+  }
+
   return `https://${trimmedValue}`;
+}
+
+function isLikelyPublicHostname(value) {
+  const normalizedValue = normalizeWhitespace(String(value)).toLowerCase();
+  if (!normalizedValue) {
+    return false;
+  }
+
+  const hostname = normalizedValue
+    .split(/[/?#]/, 1)[0]
+    .replace(/:\d{1,5}$/, '');
+  if (!hostname || hostname.includes('@') || INVALID_URL_HOST_TOKENS.has(hostname)) {
+    return false;
+  }
+
+  return PUBLIC_HOSTNAME_PATTERN.test(hostname);
 }
 
 function repairMojibake(value) {

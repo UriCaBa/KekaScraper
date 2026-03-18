@@ -1,4 +1,5 @@
 const state = {
+  initialized: false,
   outputDirectory: '',
   running: false,
   formDisabled: false,
@@ -8,7 +9,11 @@ const state = {
   logs: [],
   results: [],
   outputFiles: [],
+  lastCompletedSummary: null,
 };
+
+const INVALID_URL_HOST_TOKENS = new Set(['-', '--', 'n/a', 'na', 'nil', 'none', 'null', 'undefined', 'unknown']);
+const PUBLIC_HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 
 const elements = {
   form: document.querySelector('#scrape-form'),
@@ -36,6 +41,17 @@ const elements = {
   outputFiles: document.querySelector('#output-files'),
 };
 
+elements.runButton.disabled = true;
+elements.runButton.textContent = 'Loading...';
+elements.form.addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!state.initialized || state.formDisabled) {
+    return;
+  }
+
+  void handleSubmit();
+});
+
 bootstrap().catch((error) => {
   appendLog(`Failed to load the app: ${error.message}`, 'error');
   elements.statusCopy.textContent = error.message;
@@ -53,8 +69,6 @@ async function bootstrap() {
   populateForm(initialFormState);
   renderResults();
   renderStatus();
-
-  elements.form.addEventListener('submit', handleSubmit);
   for (const checkbox of elements.formatCheckboxes) {
     checkbox.addEventListener('change', syncFormatSelection);
   }
@@ -68,11 +82,12 @@ async function bootstrap() {
   window.kekaApp.onScrapeEvent((event) => {
     handleScrapeEvent(event);
   });
+
+  state.initialized = true;
+  setFormDisabled(false);
 }
 
-async function handleSubmit(event) {
-  event.preventDefault();
-
+async function handleSubmit() {
   let payload;
   try {
     payload = readFormState();
@@ -88,6 +103,7 @@ async function handleSubmit(event) {
   state.logs = [];
   state.results = [];
   state.outputFiles = [];
+  state.lastCompletedSummary = null;
   state.totalResults = 0;
   state.completedCities = 0;
   state.totalCities = countCities(payload.citiesText);
@@ -100,8 +116,11 @@ async function handleSubmit(event) {
     const result = await window.kekaApp.startScrape(payload);
     state.results = result.results;
     state.outputFiles = result.outputFiles;
+    state.lastCompletedSummary = result.summary;
     state.outputDirectory = result.summary.outputDirectory;
     state.totalResults = result.summary.totalResults;
+    state.completedCities = result.summary.totalCities;
+    state.totalCities = result.summary.totalCities;
     elements.outputDirectory.textContent = result.summary.outputDirectory;
     appendLog(buildCompletionMessage(result.summary));
   } catch (error) {
@@ -174,32 +193,35 @@ function handleScrapeEvent(event) {
 }
 
 function renderStatus() {
-  if (!state.running && state.logs.length === 0) {
+  if (!state.initialized && state.logs.length === 0) {
+    elements.statusCopy.textContent = 'Loading local defaults...';
+    elements.statusPhase.textContent = 'Loading';
+  } else if (!state.running && state.logs.length === 0) {
     elements.statusCopy.textContent = 'Ready to start.';
     elements.statusPhase.textContent = 'Idle';
   }
 
   elements.statusResults.textContent = `${state.totalResults}`;
   elements.statusCities.textContent = `${state.completedCities} / ${state.totalCities}`;
-  elements.activityLog.innerHTML = state.logs
-    .map((entry) => `<li class="${entry.tone}">${escapeHtml(entry.message)}</li>`)
-    .join('');
+  renderActivityLog();
 
   elements.openOutputFolderButton.disabled = !state.outputDirectory;
 }
 
 function renderResults() {
-  const hasResults = state.results.length > 0;
-  elements.resultsEmpty.hidden = hasResults;
-  elements.resultsContent.hidden = !hasResults;
+  const hasCompletedRun = Boolean(state.lastCompletedSummary);
+  elements.resultsEmpty.hidden = hasCompletedRun;
+  elements.resultsContent.hidden = !hasCompletedRun;
 
-  if (!hasResults) {
+  if (!hasCompletedRun) {
     elements.resultsTableBody.replaceChildren();
     elements.outputFiles.replaceChildren();
+    elements.resultsSummary.textContent = '0 rows';
     return;
   }
 
-  elements.resultsSummary.textContent = `${state.results.length} ${state.results.length === 1 ? 'row' : 'rows'}`;
+  const rowCount = state.lastCompletedSummary.totalResults;
+  elements.resultsSummary.textContent = `${rowCount} ${rowCount === 1 ? 'row' : 'rows'}`;
   renderResultRows();
   renderOutputFiles();
 }
@@ -277,8 +299,8 @@ function setFormDisabled(disabled) {
     element.disabled = disabled;
   }
 
-  elements.runButton.disabled = disabled;
-  elements.runButton.textContent = disabled ? 'Running...' : 'Start scrape';
+  elements.runButton.disabled = disabled || !state.initialized;
+  elements.runButton.textContent = disabled ? 'Running...' : state.initialized ? 'Start scrape' : 'Loading...';
   syncFormatSelection();
 }
 
@@ -310,25 +332,18 @@ function formatDuration(durationMs) {
   return `${minutes}m ${remainingSeconds}s`;
 }
 
-function escapeHtml(value) {
-  return `${value ?? ''}`
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
 function sanitizeExternalUrl(value) {
-  if (!value) {
+  const normalizedValue = normalizePotentialUrl(value);
+  if (!normalizedValue) {
     return null;
   }
 
-  const normalizedValue = normalizePotentialUrl(value);
-
   try {
     const parsed = new URL(normalizedValue);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    if (
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+      || !isLikelyPublicHostname(parsed.hostname)
+    ) {
       return null;
     }
 
@@ -346,6 +361,10 @@ function normalizePotentialUrl(value) {
 
   if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmedValue)) {
     return trimmedValue;
+  }
+
+  if (!isLikelyPublicHostname(trimmedValue)) {
+    return '';
   }
 
   return `https://${trimmedValue}`;
@@ -386,6 +405,19 @@ function renderResultRows() {
   }
 
   elements.resultsTableBody.replaceChildren(fragment);
+}
+
+function renderActivityLog() {
+  const fragment = document.createDocumentFragment();
+
+  for (const entry of state.logs) {
+    const item = document.createElement('li');
+    item.className = entry.tone;
+    item.textContent = entry.message;
+    fragment.append(item);
+  }
+
+  elements.activityLog.replaceChildren(fragment);
 }
 
 function renderOutputFiles() {
@@ -432,6 +464,22 @@ function createWebsiteCell(url) {
 
 function normalizeInputToken(value) {
   return `${value ?? ''}`.replace(/\s+/g, ' ').trim();
+}
+
+function isLikelyPublicHostname(value) {
+  const normalizedValue = normalizeInputToken(value).toLowerCase();
+  if (!normalizedValue) {
+    return false;
+  }
+
+  const hostname = normalizedValue
+    .split(/[/?#]/, 1)[0]
+    .replace(/:\d{1,5}$/, '');
+  if (!hostname || hostname.includes('@') || INVALID_URL_HOST_TOKENS.has(hostname)) {
+    return false;
+  }
+
+  return PUBLIC_HOSTNAME_PATTERN.test(hostname);
 }
 
 function splitCityEntries(value) {

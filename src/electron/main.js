@@ -72,7 +72,9 @@ function createMainWindow() {
 
 function registerIpcHandlers() {
   ipcMain.handle('app:get-defaults', async () => {
-    const initialFormState = await loadPreferences(app.getPath('userData'), getDefaultFormState());
+    const initialFormState = normalizeStoredFormState(
+      await loadPreferences(app.getPath('userData'), getDefaultFormState()),
+    );
 
     return {
       formState: initialFormState,
@@ -151,6 +153,27 @@ function getDefaultFormState() {
   };
 }
 
+function normalizeStoredFormState(rawFormState = {}) {
+  const fallbackState = getDefaultFormState();
+
+  return {
+    citiesText: normalizeStoredCitiesText(rawFormState.citiesText, fallbackState.citiesText),
+    resultLimit: normalizeStoredInteger(rawFormState.resultLimit, fallbackState.resultLimit, 'resultLimit'),
+    formats: normalizeFormats(rawFormState.formats),
+    browserChannel: normalizeStoredBrowserChannel(rawFormState.browserChannel, fallbackState.browserChannel),
+    headful: typeof rawFormState.headful === 'boolean' ? rawFormState.headful : fallbackState.headful,
+    enrichWebsite:
+      typeof rawFormState.enrichWebsite === 'boolean'
+        ? rawFormState.enrichWebsite
+        : fallbackState.enrichWebsite,
+    websitePageLimit: normalizeStoredInteger(
+      rawFormState.websitePageLimit,
+      fallbackState.websitePageLimit,
+      'websitePageLimit',
+    ),
+  };
+}
+
 function normalizeFormState(rawFormState = {}) {
   const citiesText = `${rawFormState.citiesText ?? ''}`.trim();
   const formats = normalizeFormats(rawFormState.formats);
@@ -184,6 +207,35 @@ function normalizeFormState(rawFormState = {}) {
       'websitePageLimit',
     ),
   };
+}
+
+function normalizeStoredBrowserChannel(value, fallbackValue) {
+  try {
+    const normalizedValue = normalizeBrowserChannel(value ?? fallbackValue, 'browser channel');
+    if (app.isPackaged && normalizedValue === 'chromium') {
+      return fallbackValue;
+    }
+
+    return normalizedValue;
+  } catch {
+    return fallbackValue;
+  }
+}
+
+function normalizeStoredCitiesText(value, fallbackValue) {
+  if (typeof value !== 'string') {
+    return fallbackValue;
+  }
+
+  return splitCities([value]).join('\n');
+}
+
+function normalizeStoredInteger(value, fallbackValue, flagName) {
+  try {
+    return normalizeInteger(value, fallbackValue, flagName);
+  } catch {
+    return fallbackValue;
+  }
 }
 
 function buildRunConfig(formState) {

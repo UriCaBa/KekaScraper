@@ -31,6 +31,13 @@
     "appId": "com.uricaba.kekascraper",
     "productName": "KekaScraper",
     "asar": false,
+    "files": [
+      "**/*",
+      "!release{,/**/*}",
+      "!output{,/**/*}",
+      "!**/node_modules/playwright/.local-browsers{,/**/*}",
+      "!**/node_modules/playwright-core/.local-browsers{,/**/*}"
+    ],
     "directories": {
       "output": "release"
     },
