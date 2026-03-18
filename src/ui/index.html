@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+    />
+    <title>KekaScraper</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Local desktop app</p>
+          <h1>KekaScraper</h1>
+          <p class="hero-copy">
+            Search Google Maps for hostel leads, enrich public contact details, and export results without touching a terminal.
+          </p>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-card">
+            <span class="meta-label">Output folder</span>
+            <strong id="output-directory">Loading...</strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">App version</span>
+            <strong id="app-version">-</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel form-panel">
+          <div class="panel-header">
+            <h2>Run a scrape</h2>
+            <p>Keep the first run simple. You can refine later if needed.</p>
+          </div>
+
+          <form id="scrape-form" class="form-grid">
+            <label class="field field-wide">
+              <span>Cities</span>
+              <textarea
+                id="cities"
+                name="cities"
+                rows="6"
+                placeholder="Barcelona&#10;Bilbao&#10;Donostia"
+                required
+              ></textarea>
+              <small>One city per line, or separated by semicolons. Commas inside a city name are preserved.</small>
+            </label>
+
+            <label class="field">
+              <span>Max results per city</span>
+              <input id="result-limit" name="resultLimit" type="number" min="1" step="1" />
+            </label>
+
+            <label class="field">
+              <span>Website pages to scan</span>
+              <input id="website-page-limit" name="websitePageLimit" type="number" min="1" step="1" />
+            </label>
+
+            <label class="field">
+              <span>Browser</span>
+              <select id="browser-channel" name="browserChannel">
+                <option value="auto">Auto</option>
+                <option value="msedge">Microsoft Edge</option>
+                <option value="chrome">Google Chrome</option>
+                <option value="chromium">Bundled Chromium</option>
+              </select>
+              <small id="browser-channel-help">Auto tries Edge, then Chrome, then bundled Chromium.</small>
+            </label>
+
+            <fieldset class="field checkbox-group">
+              <legend>Output formats</legend>
+              <label><input type="checkbox" name="formats" value="json" /> JSON</label>
+              <label><input type="checkbox" name="formats" value="csv" /> CSV</label>
+            </fieldset>
+
+            <label class="field checkbox-line">
+              <input id="headful" name="headful" type="checkbox" />
+              <span>Show the browser while scraping</span>
+            </label>
+
+            <label class="field checkbox-line">
+              <input id="enrich-website" name="enrichWebsite" type="checkbox" />
+              <span>Enrich results from each hostel website</span>
+            </label>
+
+            <div class="form-actions field-wide">
+              <button id="run-button" type="submit">Start scrape</button>
+              <p class="helper-copy">
+                Results stay on this machine. No external KekaScraper API or cloud backend is involved.
+              </p>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel status-panel">
+          <div class="panel-header">
+            <h2>Status</h2>
+            <p id="status-copy">Ready to start.</p>
+          </div>
+
+          <div class="status-grid">
+            <div class="status-card">
+              <span class="meta-label">Current phase</span>
+              <strong id="status-phase">Idle</strong>
+            </div>
+            <div class="status-card">
+              <span class="meta-label">Rows extracted</span>
+              <strong id="status-results">0</strong>
+            </div>
+            <div class="status-card">
+              <span class="meta-label">Cities processed</span>
+              <strong id="status-cities">0 / 0</strong>
+            </div>
+          </div>
+
+          <div class="log-panel">
+            <div class="log-header">
+              <h3>Activity log</h3>
+              <button id="open-output-folder" type="button" class="secondary" disabled>Open output folder</button>
+            </div>
+            <ul id="activity-log" class="activity-log"></ul>
+          </div>
+        </section>
+
+        <section class="panel results-panel">
+          <div class="panel-header">
+            <h2>Results</h2>
+            <p>Preview the latest run and open the exported files.</p>
+          </div>
+
+          <div id="results-empty" class="empty-state">
+            No results yet. Run a scrape to preview the exported lead list here.
+          </div>
+
+          <div id="results-content" class="results-content" hidden>
+            <div class="results-toolbar">
+              <span id="results-summary">0 rows</span>
+              <div id="output-files" class="file-list"></div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>City</th>
+                    <th>Website</th>
+                    <th>General email</th>
+                    <th>Best channel</th>
+                    <th>Best value</th>
+                  </tr>
+                </thead>
+                <tbody id="results-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+  </html>

@@ -5,8 +5,13 @@
   "type": "module",
   "main": "src/cli.js",
   "scripts": {
+    "start": "electron src/electron/main.js",
+    "dev": "electron src/electron/main.js",
     "scrape": "node src/cli.js",
-    "smoke": "node src/cli.js --cities \"Barcelona\" --limit 3 --formats json,csv"
+    "smoke": "node src/cli.js --cities \"Barcelona\" --limit 3 --formats json,csv",
+    "verify:contracts": "node scripts/verify-contracts.mjs",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "keywords": [
     "scraper",
@@ -18,5 +23,38 @@
   "license": "MIT",
   "dependencies": {
     "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.uricaba.kekascraper",
+    "productName": "KekaScraper",
+    "asar": false,
+    "extraMetadata": {
+      "main": "src/electron/main.js"
+    },
+    "files": [
+      "**/*",
+      "!release{,/**/*}",
+      "!output{,/**/*}",
+      "!**/node_modules/playwright/.local-browsers{,/**/*}",
+      "!**/node_modules/playwright-core/.local-browsers{,/**/*}"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis"
+      ]
+    }
   }
 }

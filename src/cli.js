@@ -1,82 +1,74 @@
 import path from 'node:path';
 import process from 'node:process';
-import { defaultConfig } from './config.js';
-import { launchBrowser } from './lib/browser.js';
-import { writeOutputs } from './lib/exporters.js';
-import { scrapeCity } from './lib/maps.js';
-import { enrichListings } from './lib/website-enricher.js';
-import { splitCities, timestampLabel } from './lib/utils.js';
-
-const ALLOWED_BROWSER_CHANNELS = new Set(['auto', 'msedge', 'chrome', 'chromium']);
+import { normalizeBrowserChannel, normalizeInteger, normalizeRunOptions } from './lib/run-options.js';
+import { RUN_EVENT_TYPES } from './lib/run-events.js';
+import { runScrape } from './lib/run-scrape.js';
+import { splitDelimitedValues } from './shared/input-normalization.js';
+import { splitCities } from './lib/utils.js';
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
+  const runConfig = parseArgs(process.argv.slice(2));
 
-  if (options.help || options.cities.length === 0) {
+  if (runConfig.help || runConfig.cities.length === 0) {
     printHelp();
-    process.exit(options.help ? 0 : 1);
+    process.exit(runConfig.help ? 0 : 1);
   }
 
-  const runConfig = {
-    ...defaultConfig,
-    ...options,
-  };
-
-  const { browser, context } = await launchBrowser(runConfig);
-  const page = await context.newPage();
-  const detailPage = await context.newPage();
-  const allResults = [];
-  let cityFailures = 0;
-
-  try {
-    for (const city of runConfig.cities) {
-      try {
-        const cityResults = await scrapeCity(page, detailPage, {
-          city,
-          queryPrefix: runConfig.queryPrefix,
-          resultLimit: runConfig.resultLimit,
-          maxScrollRounds: runConfig.maxScrollRounds,
-          retryCount: runConfig.retryCount,
-          retryDelayMs: runConfig.retryDelayMs,
-          detailPauseMs: runConfig.detailPauseMs,
-        });
-
-        allResults.push(...cityResults);
-      } catch (error) {
-        cityFailures += 1;
-        console.error(`[error] City "${city}" failed: ${error.message}`);
-      }
-    }
-  } finally {
-    await context.close();
-    await browser.close();
-  }
-
-  const finalResults = runConfig.enrichWebsite
-    ? await enrichListings(allResults, runConfig)
-    : allResults;
-
-  const baseFilename = `hostels-${timestampLabel()}`;
-  const outputFiles = await writeOutputs(finalResults, {
-    outputDir: runConfig.outputDir,
-    baseFilename,
-    formats: runConfig.formats,
+  const { summary, outputFiles } = await runScrape(runConfig, {
+    onEvent: handleCliEvent,
   });
 
-  console.log(`\n[done] Extracted ${finalResults.length} rows across ${runConfig.cities.length} cities`);
+  console.log(`\n[done] Extracted ${summary.totalResults} rows across ${summary.totalCities} cities`);
   for (const file of outputFiles) {
     console.log(`[file] ${path.resolve(file)}`);
   }
 
-  if (finalResults.length === 0 || cityFailures === runConfig.cities.length) {
-    process.exit(1);
+  if (summary.exitCode !== 0) {
+    process.exit(summary.exitCode);
+  }
+}
+
+function handleCliEvent(event) {
+  switch (event.type) {
+    case RUN_EVENT_TYPES.BROWSER_READY:
+      console.log(`[browser] ${event.selectedBrowserLabel} (requested: ${event.requestedBrowserChannel})`);
+      break;
+    case RUN_EVENT_TYPES.CITY_SEARCH_STARTED:
+      console.log(`\n[city] ${event.city}`);
+      console.log(`[search] ${event.searchQuery}`);
+      break;
+    case RUN_EVENT_TYPES.CITY_SEARCH_RESULTS:
+      console.log(`[results] Found ${event.candidateCount} candidate URLs`);
+      break;
+    case RUN_EVENT_TYPES.RETRYING:
+      console.error(`[retry] ${event.label}: ${event.message}`);
+      break;
+    case RUN_EVENT_TYPES.LISTING_FAILED:
+      console.error(`[detail-failed] ${event.listingUrl}: ${event.message}`);
+      break;
+    case RUN_EVENT_TYPES.ENRICHMENT_STARTED:
+      console.log(`[enrich] Starting website enrichment for ${event.totalListings} listings`);
+      break;
+    case RUN_EVENT_TYPES.ENRICHMENT_ITEM_SKIPPED:
+      console.log(`[enrich-skip] ${describeEnrichmentTarget(event)} (${event.reason})`);
+      break;
+    case RUN_EVENT_TYPES.ENRICHMENT_ITEM_FAILED:
+      console.error(`[enrich-failed] ${describeEnrichmentTarget(event)}: ${event.message}`);
+      break;
+    case RUN_EVENT_TYPES.WEBSITE_PAGE_SKIPPED:
+      console.error(`[website-skip] ${event.url}: ${event.message}`);
+      break;
+    case RUN_EVENT_TYPES.CITY_FAILED:
+      console.error(`[city-failed] ${event.city}: ${event.message}`);
+      break;
+    default:
+      break;
   }
 }
 
 function parseArgs(argv) {
   const options = {
     cities: [],
-    formats: ['json'],
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -100,7 +92,7 @@ function parseArgs(argv) {
         index += 1;
         break;
       case '--formats':
-        options.formats = splitCities([expectValue(argv, index, arg)])
+        options.formats = splitDelimitedValues([expectValue(argv, index, arg)])
           .map((value) => value.toLowerCase())
           .filter((value) => value === 'json' || value === 'csv');
         index += 1;
@@ -112,7 +104,7 @@ function parseArgs(argv) {
         options.headless = true;
         break;
       case '--slow-mo':
-        options.slowMo = parseInteger(expectValue(argv, index, arg), arg);
+        options.slowMo = parseInteger(expectValue(argv, index, arg), arg, { min: 0 });
         index += 1;
         break;
       case '--max-scroll-rounds':
@@ -120,7 +112,7 @@ function parseArgs(argv) {
         index += 1;
         break;
       case '--browser-channel':
-        options.browserChannel = parseBrowserChannel(expectValue(argv, index, arg), arg);
+        options.browserChannel = normalizeBrowserChannel(expectValue(argv, index, arg), arg);
         index += 1;
         break;
       case '--query-prefix':
@@ -146,13 +138,7 @@ function parseArgs(argv) {
     }
   }
 
-  options.cities = [...new Set(options.cities.map((city) => city.trim()).filter(Boolean))];
-
-  if (!options.formats.length) {
-    options.formats = ['json'];
-  }
-
-  return options;
+  return normalizeRunOptions(options, { requireCities: false });
 }
 
 function expectValue(argv, index, flagName) {
@@ -163,23 +149,12 @@ function expectValue(argv, index, flagName) {
   return value;
 }
 
-function parseInteger(value, flagName) {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed)) {
-    throw new Error(`Expected an integer for ${flagName}, got "${value}"`);
-  }
-  return parsed;
+function parseInteger(value, flagName, options = {}) {
+  return normalizeInteger(value, undefined, flagName, options);
 }
 
-function parseBrowserChannel(value, flagName) {
-  const normalizedValue = value.trim().toLowerCase();
-  if (!ALLOWED_BROWSER_CHANNELS.has(normalizedValue)) {
-    throw new Error(
-      `Expected one of ${Array.from(ALLOWED_BROWSER_CHANNELS).join(', ')} for ${flagName}, got "${value}"`,
-    );
-  }
-
-  return normalizedValue;
+function describeEnrichmentTarget(event) {
+  return event.name ?? event.website ?? 'listing without website';
 }
 
 function printHelp() {
@@ -187,10 +162,10 @@ function printHelp() {
 KekaScraper
 
 Usage:
-  npm run scrape -- --cities "Barcelona,Bilbao"
+  npm run scrape -- --cities "Barcelona;Bilbao"
 
 Options:
-  --cities "A,B,C"         Comma, semicolon, or newline separated cities
+  --cities "A;B;C"         Semicolon or newline separated cities
   --city "Barcelona"       Repeatable city flag
   --limit 20               Max result rows per city
   --formats json,csv       Output formats

@@ -1,4 +1,5 @@
 import { firstNonEmpty, normalizeUrl, normalizeWhitespace, parseNumber, retry, uniqueNonEmpty } from './utils.js';
+import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
 
 const CONTACT_KEYWORDS = [
   'contact',
@@ -70,23 +71,44 @@ const ROLE_THEN_NAME_REGEX = new RegExp(
   'i',
 );
 
-export async function enrichListings(listings, options) {
+export async function enrichListings(listings, options, hooks = {}) {
+  const emit = typeof hooks.onEvent === 'function' ? hooks.onEvent : () => {};
   const enriched = [];
 
   for (const [index, listing] of listings.entries()) {
+    emitRunEvent(emit, RUN_EVENT_TYPES.ENRICHMENT_ITEM_STARTED, {
+      index: index + 1,
+      totalListings: listings.length,
+      name: listing.name ?? null,
+      website: listing.website ?? null,
+    });
+
     if (!listing.website || !options.enrichWebsite) {
       enriched.push(withDefaultEnrichment(listing));
+      emitRunEvent(emit, RUN_EVENT_TYPES.ENRICHMENT_ITEM_SKIPPED, {
+        index: index + 1,
+        totalListings: listings.length,
+        name: listing.name ?? null,
+        website: listing.website ?? null,
+        reason: listing.website ? 'disabled' : 'no-website',
+      });
       continue;
     }
 
     try {
-      console.log(`[enrich] ${index + 1}/${listings.length} ${listing.website}`);
       const enrichment = await retry(
-        () => enrichFromWebsite(listing, options),
+        () => enrichFromWebsite(listing, options, { onEvent: emit }),
         {
           retries: options.retryCount,
           delayMs: options.retryDelayMs,
           label: `enrich website ${listing.website}`,
+          onEvent: emit,
+          eventContext: {
+            index: index + 1,
+            totalListings: listings.length,
+            name: listing.name ?? null,
+            website: listing.website ?? null,
+          },
         },
       );
 
@@ -94,18 +116,30 @@ export async function enrichListings(listings, options) {
         ...withDefaultEnrichment(listing),
         ...enrichment,
       });
+      emitRunEvent(emit, RUN_EVENT_TYPES.ENRICHMENT_ITEM_COMPLETED, {
+        index: index + 1,
+        totalListings: listings.length,
+        name: listing.name ?? null,
+        website: listing.website ?? null,
+      });
     } catch (error) {
-      console.warn(`[warn] Website enrichment failed for ${listing.website}: ${error.message}`);
       enriched.push(withDefaultEnrichment(listing, {
         websiteScanStatus: 'failed',
       }));
+      emitRunEvent(emit, RUN_EVENT_TYPES.ENRICHMENT_ITEM_FAILED, {
+        index: index + 1,
+        totalListings: listings.length,
+        name: listing.name ?? null,
+        website: listing.website ?? null,
+        message: error.message,
+      });
     }
   }
 
   return enriched;
 }
 
-async function enrichFromWebsite(listing, options) {
+async function enrichFromWebsite(listing, options, hooks = {}) {
   const homepageUrl = normalizeUrl(listing.website);
   if (!homepageUrl) {
     throw new Error('Invalid website URL');
@@ -113,7 +147,7 @@ async function enrichFromWebsite(listing, options) {
 
   const homepage = await fetchHtmlPage(homepageUrl, options);
   const websiteDomain = new URL(homepage.finalUrl).hostname.replace(/^www\./i, '');
-  const scannedPages = await crawlWebsite(homepage, options);
+  const scannedPages = await crawlWebsite(homepage, options, hooks.onEvent);
   const candidatePages = scannedPages.slice(1).map((page) => page.finalUrl);
   const emailCandidates = buildEmailCandidates(scannedPages, websiteDomain, listing);
   const allPhones = uniqueNonEmpty(scannedPages.flatMap((page) => page.phones));
@@ -241,7 +275,7 @@ async function fetchHtmlPage(url, options) {
   }
 }
 
-async function crawlWebsite(homepage, options) {
+async function crawlWebsite(homepage, options, onEvent = () => {}) {
   const maxPages = Math.max(1, options.websitePageLimit);
   const visited = new Set([normalizePageKey(homepage.finalUrl)]);
   const scannedPages = [homepage];
@@ -272,7 +306,11 @@ async function crawlWebsite(homepage, options) {
         }
       }
     } catch (error) {
-      console.warn(`[warn] Skipping ${next.url}: ${error.message}`);
+      emitRunEvent(onEvent, RUN_EVENT_TYPES.WEBSITE_PAGE_SKIPPED, {
+        sourceUrl: homepage.finalUrl,
+        url: next.url,
+        message: error.message,
+      });
     }
   }
 

@@ -8,12 +8,20 @@ export async function launchBrowser(options) {
     locale,
     navigationTimeoutMs,
     actionTimeoutMs,
+    allowBundledChromium = true,
   } = options;
 
   let browser;
   let launchError;
   let selectedLaunchCandidate;
-  const launchCandidates = getLaunchCandidates(browserChannel);
+  const launchCandidates = getLaunchCandidates(browserChannel, { allowBundledChromium });
+
+  if (launchCandidates.length === 0) {
+    const chromiumDisabledReason = describeBundledChromiumDisabledReason({ browserChannel, allowBundledChromium });
+    throw new Error(
+      `Bundled Chromium is unavailable for requested browser channel "${browserChannel}". ${chromiumDisabledReason}`,
+    );
+  }
 
   for (const candidate of launchCandidates) {
     try {
@@ -46,7 +54,14 @@ export async function launchBrowser(options) {
     context.setDefaultNavigationTimeout(navigationTimeoutMs);
     context.setDefaultTimeout(actionTimeoutMs);
 
-    return { browser, context };
+    return {
+      browser,
+      context,
+      launchSummary: {
+        requestedBrowserChannel: browserChannel,
+        selectedCandidateLabel: selectedLaunchCandidate?.label ?? 'unknown browser',
+      },
+    };
   } catch (error) {
     await browser.close().catch(() => {});
     throw new Error(
@@ -57,8 +72,12 @@ export async function launchBrowser(options) {
   }
 }
 
-function getLaunchCandidates(browserChannel) {
+function getLaunchCandidates(browserChannel, { allowBundledChromium = true } = {}) {
   if (browserChannel && browserChannel !== 'auto') {
+    if (browserChannel === 'chromium' && !allowBundledChromium) {
+      return [];
+    }
+
     return [makeChannelCandidate(browserChannel)];
   }
 
@@ -66,7 +85,7 @@ function getLaunchCandidates(browserChannel) {
 
   return [
     ...autoFallbackChannels.map((channel) => makeChannelCandidate(channel)),
-    makeBundledChromiumCandidate(),
+    ...(allowBundledChromium ? [makeBundledChromiumCandidate()] : []),
   ];
 }
 
@@ -76,7 +95,7 @@ function makeChannelCandidate(channel) {
   }
 
   return {
-    label: channel,
+    label: formatChannelLabel(channel),
     launchOptions: { channel },
   };
 }
@@ -90,4 +109,29 @@ function makeBundledChromiumCandidate(label = 'bundled Chromium') {
 
 function formatCandidateLabels(candidates) {
   return candidates.map((candidate) => `"${candidate.label}"`).join(', ');
+}
+
+function formatChannelLabel(channel) {
+  switch (channel) {
+    case 'msedge':
+      return 'Microsoft Edge';
+    case 'chrome':
+      return 'Google Chrome';
+    case 'chromium':
+      return 'Chromium';
+    default:
+      return channel;
+  }
+}
+
+function describeBundledChromiumDisabledReason({ browserChannel, allowBundledChromium }) {
+  if (browserChannel !== 'chromium') {
+    return 'Use Auto, Microsoft Edge, or Google Chrome instead.';
+  }
+
+  if (!allowBundledChromium) {
+    return 'Bundled Chromium is disabled by the current runtime configuration.';
+  }
+
+  return 'Bundled Chromium is not available in the current runtime configuration.';
 }

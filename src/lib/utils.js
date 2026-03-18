@@ -1,4 +1,11 @@
 import fs from 'node:fs/promises';
+import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
+import {
+  hasUrlCredentials,
+  isLikelyPublicHostname,
+  normalizePotentialUrl as normalizeSharedPotentialUrl,
+  splitCityInput,
+} from '../shared/input-normalization.js';
 
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -9,6 +16,8 @@ export async function retry(task, options = {}) {
     retries = 2,
     delayMs = 1000,
     label = 'operation',
+    onEvent,
+    eventContext = {},
   } = options;
 
   let lastError;
@@ -23,7 +32,13 @@ export async function retry(task, options = {}) {
         break;
       }
 
-      console.warn(`[retry] ${label} failed on attempt ${attempt}. Retrying...`);
+      emitRunEvent(onEvent ?? (() => {}), RUN_EVENT_TYPES.RETRYING, {
+        ...eventContext,
+        label,
+        attempt,
+        retries,
+        message: error.message,
+      });
       await sleep(delayMs);
     }
   }
@@ -166,8 +181,7 @@ export function timestampLabel(date = new Date()) {
 }
 
 export function splitCities(rawValues) {
-  return rawValues
-    .flatMap((value) => String(value).split(/[,\n;]+/))
+  return splitCityInput(rawValues)
     .map((city) => normalizeWhitespace(city))
     .filter(Boolean);
 }
@@ -178,7 +192,21 @@ export function normalizeUrl(value) {
   }
 
   try {
-    return new URL(value).toString();
+    const normalizedValue = normalizeSharedPotentialUrl(value);
+    if (!normalizedValue) {
+      return null;
+    }
+
+    const parsed = new URL(normalizedValue);
+    if (
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+      || hasUrlCredentials(parsed)
+      || !isLikelyPublicHostname(parsed.hostname)
+    ) {
+      return null;
+    }
+
+    return parsed.toString();
   } catch {
     return null;
   }

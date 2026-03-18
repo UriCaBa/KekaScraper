@@ -1,6 +1,6 @@
 # KekaScraper
 
-Reusable Node.js + Playwright scraper for Google Maps hostel searches by city.
+Reusable local scraper for Google Maps hostel searches by city, with both a CLI and a desktop app.
 
 ## What it does
 
@@ -38,7 +38,10 @@ Reusable Node.js + Playwright scraper for Google Maps hostel searches by city.
   - `lastSeenAt`
   - `roomCount`
   - `bedCount`
-- Writes output to `output/` as JSON and optional CSV
+- Writes output locally:
+  - CLI runs default to JSON in `output/`
+  - the desktop app writes to your Documents folder under `KekaScraper/output`
+- Includes a local Electron desktop app for non-technical users targeting Windows and macOS
 
 ## Requirements
 
@@ -48,10 +51,35 @@ Reusable Node.js + Playwright scraper for Google Maps hostel searches by city.
 - One supported Chromium-based browser available:
   - preferred: Microsoft Edge
   - fallback: Google Chrome
-  - last fallback: Playwright bundled Chromium
+  - CLI and local development can also use Playwright bundled Chromium
+  - packaged desktop builds currently expect Edge or Chrome to be installed on the machine
   - Linux is expected to use Playwright bundled Chromium unless you install a supported browser channel
 
-## Usage
+## Desktop app
+
+Start the local desktop app:
+
+```bash
+npm run start
+```
+
+Package the desktop app:
+
+```bash
+npm run pack
+```
+
+Create installable artifacts:
+
+```bash
+npm run dist
+```
+
+The desktop app stores exported results in your Documents folder under `KekaScraper/output` and remembers the last basic settings locally on the same machine.
+It defaults to JSON output to match the CLI. Enable CSV explicitly in the form when you need it.
+Current packaged desktop builds are configured around system browsers. For the smoothest first-run experience on client machines, keep Microsoft Edge or Google Chrome installed and use `Auto`, `Microsoft Edge`, or `Google Chrome` in the app.
+
+## CLI usage
 
 Install dependencies:
 
@@ -68,7 +96,7 @@ npm run scrape -- --cities "Barcelona"
 Run for multiple cities:
 
 ```bash
-npm run scrape -- --cities "Barcelona,Bilbao,Donostia" --limit 15 --formats json,csv
+npm run scrape -- --cities "Barcelona;Bilbao;Donostia" --limit 15 --formats json,csv
 ```
 
 Run without website enrichment:
@@ -85,7 +113,7 @@ npm run scrape -- --cities "Barcelona" --headful
 
 ## CLI options
 
-- `--cities "Barcelona,Bilbao"` Comma, semicolon, or newline separated cities
+- `--cities "Barcelona;Bilbao"` Semicolon or newline separated cities
 - `--city "Barcelona"` Repeatable single-city flag
 - `--limit 20` Max results per city
 - `--formats json,csv` Output formats
@@ -101,6 +129,10 @@ npm run scrape -- --cities "Barcelona" --headful
 
 - Google Maps DOM changes regularly. Selectors for category, reviews, address, and website are pragmatic fallbacks and may need adjustments over time.
 - Browser launch is cross-platform. By default the scraper tries Edge first, then Chrome, then bundled Chromium. On Linux, the most portable setup is usually Playwright bundled Chromium. You can still force a browser with `--browser-channel`.
+- City lists should use newlines or semicolons as separators. Commas are preserved inside a city token so inputs such as `Paris, France` stay intact.
+- Packaged desktop builds currently use system browsers only. The CLI and unpackaged local development runs can still use Playwright bundled Chromium.
+- The desktop app is fully local. It does not call any external KekaScraper API or cloud backend.
+- Windows packaging is validated from the current development environment. macOS remains a target, but it is not considered validated until the app is built on macOS or on a macOS runner.
 - Some listings do not expose phone, website, or category publicly.
 - Hostel filtering is heuristic and based on listing name, category, and URL signals. It reduces hotel noise, but it is not perfect.
 - Website enrichment only uses public pages from the property website. It does not rely on LinkedIn or paid APIs.
