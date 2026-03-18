@@ -57,12 +57,15 @@ This project is intentionally local-first:
 - Cleanup code must not mask successful scrape results. Use tolerant teardown patterns such as `Promise.allSettled(...)` or guarded closes.
 - Validate parsed form state before flipping the desktop UI into a running or disabled state.
 - Keep frontend constraints aligned with backend behavior. If the backend requires at least one format or one valid city, the UI must enforce the same rule explicitly.
+- When a UI temporarily disables inputs during a run, restore any dynamic validation or checkbox guards when the form becomes interactive again.
+- Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
 
 ## Packaging Guardrails
 
 - Keep packaged-app behavior aligned with what is actually shipped, not with local development assumptions.
 - Do not expose bundled Chromium in packaged desktop builds unless the build explicitly ships a runnable Playwright browser payload.
 - If packaging constraints force a narrower runtime contract, reflect that in the UI, runtime validation, and README at the same time.
+- Do not over-constrain `electron-builder` packaged files in a way that drops production dependencies such as `node_modules`.
 - Do not claim macOS packaging is validated unless it has been built on macOS or on a macOS CI runner.
 
 ## Validation Expectations

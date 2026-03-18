@@ -307,6 +307,7 @@ function setFormDisabled(disabled) {
 
   elements.runButton.disabled = disabled;
   elements.runButton.textContent = disabled ? 'Running...' : 'Start scrape';
+  syncFormatSelection();
 }
 
 function appendLog(message, tone = 'info') {
@@ -365,8 +366,10 @@ function sanitizeExternalUrl(value) {
     return null;
   }
 
+  const normalizedValue = normalizePotentialUrl(value);
+
   try {
-    const parsed = new URL(value);
+    const parsed = new URL(normalizedValue);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       return null;
     }
@@ -375,6 +378,19 @@ function sanitizeExternalUrl(value) {
   } catch {
     return null;
   }
+}
+
+function normalizePotentialUrl(value) {
+  const trimmedValue = `${value}`.trim();
+  if (!trimmedValue) {
+    return '';
+  }
+
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  return `https://${trimmedValue}`;
 }
 
 function syncFormatSelection() {
