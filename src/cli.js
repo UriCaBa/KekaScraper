@@ -1,75 +1,27 @@
 import path from 'node:path';
 import process from 'node:process';
-import { defaultConfig } from './config.js';
-import { launchBrowser } from './lib/browser.js';
-import { writeOutputs } from './lib/exporters.js';
-import { scrapeCity } from './lib/maps.js';
-import { enrichListings } from './lib/website-enricher.js';
-import { splitCities, timestampLabel } from './lib/utils.js';
-
-const ALLOWED_BROWSER_CHANNELS = new Set(['auto', 'msedge', 'chrome', 'chromium']);
+import { normalizeBrowserChannel, normalizeInteger, normalizeRunOptions } from './lib/run-options.js';
+import { runScrape } from './lib/run-scrape.js';
+import { splitCities } from './lib/utils.js';
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
+  const parsedArgs = parseArgs(process.argv.slice(2));
 
-  if (options.help || options.cities.length === 0) {
+  if (parsedArgs.help || parsedArgs.cities.length === 0) {
     printHelp();
-    process.exit(options.help ? 0 : 1);
+    process.exit(parsedArgs.help ? 0 : 1);
   }
 
-  const runConfig = {
-    ...defaultConfig,
-    ...options,
-  };
+  const runConfig = normalizeRunOptions(parsedArgs);
+  const { summary, outputFiles } = await runScrape(runConfig);
 
-  const { browser, context } = await launchBrowser(runConfig);
-  const page = await context.newPage();
-  const detailPage = await context.newPage();
-  const allResults = [];
-  let cityFailures = 0;
-
-  try {
-    for (const city of runConfig.cities) {
-      try {
-        const cityResults = await scrapeCity(page, detailPage, {
-          city,
-          queryPrefix: runConfig.queryPrefix,
-          resultLimit: runConfig.resultLimit,
-          maxScrollRounds: runConfig.maxScrollRounds,
-          retryCount: runConfig.retryCount,
-          retryDelayMs: runConfig.retryDelayMs,
-          detailPauseMs: runConfig.detailPauseMs,
-        });
-
-        allResults.push(...cityResults);
-      } catch (error) {
-        cityFailures += 1;
-        console.error(`[error] City "${city}" failed: ${error.message}`);
-      }
-    }
-  } finally {
-    await context.close();
-    await browser.close();
-  }
-
-  const finalResults = runConfig.enrichWebsite
-    ? await enrichListings(allResults, runConfig)
-    : allResults;
-
-  const baseFilename = `hostels-${timestampLabel()}`;
-  const outputFiles = await writeOutputs(finalResults, {
-    outputDir: runConfig.outputDir,
-    baseFilename,
-    formats: runConfig.formats,
-  });
-
-  console.log(`\n[done] Extracted ${finalResults.length} rows across ${runConfig.cities.length} cities`);
+  console.log(`\n[done] Extracted ${summary.totalResults} rows across ${summary.totalCities} cities`);
   for (const file of outputFiles) {
     console.log(`[file] ${path.resolve(file)}`);
   }
 
-  if (finalResults.length === 0 || cityFailures === runConfig.cities.length) {
-    process.exit(1);
+  if (summary.exitCode !== 0) {
+    process.exit(summary.exitCode);
   }
 }
 
@@ -120,7 +72,7 @@ function parseArgs(argv) {
         index += 1;
         break;
       case '--browser-channel':
-        options.browserChannel = parseBrowserChannel(expectValue(argv, index, arg), arg);
+        options.browserChannel = normalizeBrowserChannel(expectValue(argv, index, arg), arg);
         index += 1;
         break;
       case '--query-prefix':
@@ -146,13 +98,7 @@ function parseArgs(argv) {
     }
   }
 
-  options.cities = [...new Set(options.cities.map((city) => city.trim()).filter(Boolean))];
-
-  if (!options.formats.length) {
-    options.formats = ['json'];
-  }
-
-  return options;
+  return normalizeRunOptions(options, { requireCities: false });
 }
 
 function expectValue(argv, index, flagName) {
@@ -164,22 +110,7 @@ function expectValue(argv, index, flagName) {
 }
 
 function parseInteger(value, flagName) {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed)) {
-    throw new Error(`Expected an integer for ${flagName}, got "${value}"`);
-  }
-  return parsed;
-}
-
-function parseBrowserChannel(value, flagName) {
-  const normalizedValue = value.trim().toLowerCase();
-  if (!ALLOWED_BROWSER_CHANNELS.has(normalizedValue)) {
-    throw new Error(
-      `Expected one of ${Array.from(ALLOWED_BROWSER_CHANNELS).join(', ')} for ${flagName}, got "${value}"`,
-    );
-  }
-
-  return normalizedValue;
+  return normalizeInteger(value, undefined, flagName);
 }
 
 function printHelp() {

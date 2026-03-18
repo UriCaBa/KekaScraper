@@ -46,7 +46,14 @@ export async function launchBrowser(options) {
     context.setDefaultNavigationTimeout(navigationTimeoutMs);
     context.setDefaultTimeout(actionTimeoutMs);
 
-    return { browser, context };
+    return {
+      browser,
+      context,
+      launchSummary: {
+        requestedBrowserChannel: browserChannel,
+        selectedCandidateLabel: selectedLaunchCandidate?.label ?? 'unknown browser',
+      },
+    };
   } catch (error) {
     await browser.close().catch(() => {});
     throw new Error(

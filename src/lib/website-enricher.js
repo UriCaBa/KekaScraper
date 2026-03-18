@@ -70,12 +70,28 @@ const ROLE_THEN_NAME_REGEX = new RegExp(
   'i',
 );
 
-export async function enrichListings(listings, options) {
+export async function enrichListings(listings, options, hooks = {}) {
+  const emit = typeof hooks.onEvent === 'function' ? hooks.onEvent : () => {};
   const enriched = [];
 
   for (const [index, listing] of listings.entries()) {
+    emit({
+      type: 'enrichment-item-started',
+      index: index + 1,
+      totalListings: listings.length,
+      name: listing.name ?? null,
+      website: listing.website ?? null,
+    });
+
     if (!listing.website || !options.enrichWebsite) {
       enriched.push(withDefaultEnrichment(listing));
+      emit({
+        type: 'enrichment-item-completed',
+        index: index + 1,
+        totalListings: listings.length,
+        name: listing.name ?? null,
+        website: listing.website ?? null,
+      });
       continue;
     }
 
@@ -94,11 +110,26 @@ export async function enrichListings(listings, options) {
         ...withDefaultEnrichment(listing),
         ...enrichment,
       });
+      emit({
+        type: 'enrichment-item-completed',
+        index: index + 1,
+        totalListings: listings.length,
+        name: listing.name ?? null,
+        website: listing.website ?? null,
+      });
     } catch (error) {
       console.warn(`[warn] Website enrichment failed for ${listing.website}: ${error.message}`);
       enriched.push(withDefaultEnrichment(listing, {
         websiteScanStatus: 'failed',
       }));
+      emit({
+        type: 'enrichment-item-failed',
+        index: index + 1,
+        totalListings: listings.length,
+        name: listing.name ?? null,
+        website: listing.website ?? null,
+        message: error.message,
+      });
     }
   }
 

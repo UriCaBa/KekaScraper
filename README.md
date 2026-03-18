@@ -1,6 +1,6 @@
 # KekaScraper
 
-Reusable Node.js + Playwright scraper for Google Maps hostel searches by city.
+Reusable local scraper for Google Maps hostel searches by city, with both a CLI and a desktop app.
 
 ## What it does
 
@@ -39,6 +39,7 @@ Reusable Node.js + Playwright scraper for Google Maps hostel searches by city.
   - `roomCount`
   - `bedCount`
 - Writes output to `output/` as JSON and optional CSV
+- Includes a local Electron desktop app for non-technical users on Windows and macOS
 
 ## Requirements
 
@@ -51,7 +52,29 @@ Reusable Node.js + Playwright scraper for Google Maps hostel searches by city.
   - last fallback: Playwright bundled Chromium
   - Linux is expected to use Playwright bundled Chromium unless you install a supported browser channel
 
-## Usage
+## Desktop app
+
+Start the local desktop app:
+
+```bash
+npm run start
+```
+
+Package the desktop app:
+
+```bash
+npm run pack
+```
+
+Create installable artifacts:
+
+```bash
+npm run dist
+```
+
+The desktop app stores exported results in your Documents folder under `KekaScraper/output` and remembers the last basic settings locally on the same machine.
+
+## CLI usage
 
 Install dependencies:
 
@@ -101,6 +124,7 @@ npm run scrape -- --cities "Barcelona" --headful
 
 - Google Maps DOM changes regularly. Selectors for category, reviews, address, and website are pragmatic fallbacks and may need adjustments over time.
 - Browser launch is cross-platform. By default the scraper tries Edge first, then Chrome, then bundled Chromium. On Linux, the most portable setup is usually Playwright bundled Chromium. You can still force a browser with `--browser-channel`.
+- The desktop app is fully local. It does not call any external KekaScraper API or cloud backend.
 - Some listings do not expose phone, website, or category publicly.
 - Hostel filtering is heuristic and based on listing name, category, and URL signals. It reduces hotel noise, but it is not perfect.
 - Website enrichment only uses public pages from the property website. It does not rely on LinkedIn or paid APIs.
