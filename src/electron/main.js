@@ -1,5 +1,6 @@
 import path from 'node:path';
 import process from 'node:process';
+import { realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { defaultConfig } from '../config.js';
@@ -43,6 +44,7 @@ function createMainWindow() {
       preload: path.join(currentDir, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
@@ -120,7 +122,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('scrape:open-output-file', async (_, filePath) => {
-    if (!isPathInsideOutputDirectory(filePath)) {
+    if (!await isPathInsideOutputDirectory(filePath)) {
       throw new Error('The requested file is outside the allowed output directory.');
     }
 
@@ -191,14 +193,18 @@ function isSafeExternalUrl(value) {
   }
 }
 
-function isPathInsideOutputDirectory(candidatePath) {
+async function isPathInsideOutputDirectory(candidatePath) {
   if (!candidatePath) {
     return false;
   }
 
-  const outputDirectory = path.resolve(getDesktopOutputDirectory());
-  const resolvedCandidate = path.resolve(candidatePath);
-  const relativePath = path.relative(outputDirectory, resolvedCandidate);
+  try {
+    const outputDirectory = await realpath(getDesktopOutputDirectory());
+    const resolvedCandidate = await realpath(candidatePath);
+    const relativePath = path.relative(outputDirectory, resolvedCandidate);
 
-  return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+    return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+  } catch {
+    return false;
+  }
 }

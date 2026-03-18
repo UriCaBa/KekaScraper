@@ -71,8 +71,10 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
       }
     }
   } finally {
-    await context.close();
-    await browser.close();
+    await Promise.allSettled([
+      context.close(),
+      browser.close(),
+    ]);
   }
 
   let finalResults = allResults;

@@ -251,13 +251,19 @@ function readFormState() {
   const selectedFormats = elements.formatCheckboxes
     .filter((checkbox) => checkbox.checked)
     .map((checkbox) => checkbox.value);
+  const citiesText = elements.cities.value;
+  const totalCities = countCities(citiesText);
 
   if (selectedFormats.length === 0) {
     throw new Error('Select at least one output format before starting the scrape.');
   }
 
+  if (totalCities === 0) {
+    throw new Error('Add at least one valid city before starting the scrape.');
+  }
+
   return {
-    citiesText: elements.cities.value,
+    citiesText,
     resultLimit: elements.resultLimit.value,
     websitePageLimit: elements.websitePageLimit.value,
     browserChannel: elements.browserChannel.value,
