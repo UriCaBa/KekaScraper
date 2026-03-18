@@ -181,10 +181,10 @@ Options:
   --city "Barcelona"       Repeatable city flag
   --limit 20               Max result rows per city
   --formats json,csv       Output formats
-  --headful                Run Edge with UI visible
+  --headful                Run the browser with UI visible
   --slow-mo 250            Slow down Playwright actions
   --max-scroll-rounds 12   Scroll attempts for result list
-  --browser-channel msedge Playwright browser channel
+  --browser-channel auto|msedge|chrome|chromium
   --query-prefix "hostels in"
   --enrich                 Enrich from the official website
   --no-enrich              Skip website enrichment
