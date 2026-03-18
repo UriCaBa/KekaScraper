@@ -10,12 +10,13 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
   const emit = createEmitter(hooks.onEvent);
   const startedAt = new Date();
   const runConfig = normalizeRunOptions(inputOptions, { requireCities: true });
+  const outputDir = normalizeOutputDir(runConfig.outputDir);
 
   emit({
     type: 'run-started',
     startedAt: startedAt.toISOString(),
     cities: runConfig.cities,
-    outputDirectory: runConfig.outputDir,
+    outputDirectory: outputDir,
   });
 
   const { browser, context, launchSummary } = await launchBrowser(runConfig);
@@ -92,7 +93,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
 
   const baseFilename = `hostels-${timestampLabel()}`;
   const outputFiles = await writeOutputs(finalResults, {
-    outputDir: runConfig.outputDir,
+    outputDir,
     baseFilename,
     formats: runConfig.formats,
   });
@@ -102,6 +103,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     startedAt,
     finishedAt,
     runConfig,
+    outputDir,
     cityFailures,
     totalResults: finalResults.length,
     outputFiles,
@@ -138,12 +140,12 @@ function createEmitter(onEvent) {
   };
 }
 
-function buildSummary({ startedAt, finishedAt, runConfig, cityFailures, totalResults, outputFiles, launchSummary }) {
+function buildSummary({ startedAt, finishedAt, runConfig, outputDir, cityFailures, totalResults, outputFiles, launchSummary }) {
   const totalCities = runConfig.cities.length;
   const durationMs = finishedAt.getTime() - startedAt.getTime();
   const outputDirectory = outputFiles[0]
     ? path.dirname(outputFiles[0])
-    : path.resolve(runConfig.outputDir);
+    : path.resolve(outputDir);
 
   let outcome = 'success';
   if (cityFailures === totalCities) {
@@ -169,4 +171,10 @@ function buildSummary({ startedAt, finishedAt, runConfig, cityFailures, totalRes
     requestedBrowserChannel: runConfig.browserChannel,
     enrichWebsite: runConfig.enrichWebsite,
   };
+}
+
+function normalizeOutputDir(value) {
+  return typeof value === 'string' && value.trim()
+    ? value
+    : defaultConfig.outputDir;
 }

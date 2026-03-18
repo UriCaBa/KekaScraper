@@ -53,6 +53,7 @@ This project is intentionally local-first:
 - Open external links only through a safe main-process bridge and only for `http` / `https` URLs.
 - Validate local file access against the allowed output directory in the main process, using canonical paths where the boundary matters.
 - Create required output directories before opening or writing to them instead of assuming they already exist.
+- For critical shared config such as `outputDir`, normalize once near the boundary and reuse the normalized local value across events, exports, and summaries.
 - Before sending IPC events from Electron main to renderer, guard against destroyed windows and destroyed `webContents`.
 - Treat `shell.openPath()` as fallible. Check its returned error string and convert failures into explicit errors instead of assuming success.
 - Put browser, context, and page lifecycle under `try` / `finally` so Playwright resources are always cleaned up.
