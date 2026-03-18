@@ -1,6 +1,6 @@
 import path from 'node:path';
 import process from 'node:process';
-import { mkdir, realpath } from 'node:fs/promises';
+import { access, mkdir, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { defaultConfig } from '../config.js';
@@ -130,11 +130,12 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('scrape:open-output-file', async (_, filePath) => {
-    if (!await isPathInsideOutputDirectory(filePath)) {
-      throw new Error('The requested file is outside the allowed output directory.');
+    const outputFileCheck = await validateOutputFilePath(filePath);
+    if (!outputFileCheck.ok) {
+      throw new Error(outputFileCheck.message);
     }
 
-    const result = await shell.openPath(filePath);
+    const result = await shell.openPath(outputFileCheck.canonicalPath);
     if (result) {
       throw new Error(result);
     }
@@ -265,19 +266,36 @@ function isSafeExternalUrl(value) {
   }
 }
 
-async function isPathInsideOutputDirectory(candidatePath) {
+async function validateOutputFilePath(candidatePath) {
   if (!candidatePath) {
-    return false;
+    return { ok: false, message: 'The requested file path is empty.' };
+  }
+
+  const outputDirectoryPath = getDesktopOutputDirectory();
+  if (!await pathExists(outputDirectoryPath)) {
+    return { ok: false, message: 'The output folder does not exist yet.' };
   }
 
   try {
-    const outputDirectory = await realpath(getDesktopOutputDirectory());
+    const outputDirectory = await realpath(outputDirectoryPath);
     const resolvedCandidate = await resolveCanonicalCandidatePath(candidatePath);
     const relativePath = path.relative(outputDirectory, resolvedCandidate);
 
-    return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
-  } catch {
-    return false;
+    if (relativePath === '' || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      return { ok: false, message: 'The requested file is outside the allowed output directory.' };
+    }
+
+    if (!await pathExists(resolvedCandidate)) {
+      return { ok: false, message: 'The requested output file no longer exists.' };
+    }
+
+    return { ok: true, canonicalPath: resolvedCandidate };
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return { ok: false, message: 'The requested output file no longer exists.' };
+    }
+
+    throw error;
   }
 }
 
@@ -305,5 +323,14 @@ async function resolveCanonicalCandidatePath(candidatePath) {
 
     const parentDirectory = await realpath(path.dirname(resolvedCandidatePath));
     return path.join(parentDirectory, path.basename(resolvedCandidatePath));
+  }
+}
+
+async function pathExists(targetPath) {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
   }
 }

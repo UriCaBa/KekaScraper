@@ -76,6 +76,7 @@ This project is intentionally local-first:
 - Final desktop UI state should reconcile from the returned scrape summary, not rely exclusively on streamed IPC progress events.
 - Distinguish “no run yet” from “run completed with 0 rows” in the results area so exported files remain accessible after empty runs.
 - Separate path containment checks from file-existence checks so missing files return accurate errors instead of looking like boundary violations.
+- For local file-opening actions, distinguish clearly between “outside allowed boundary”, “output directory missing”, and “file missing” instead of collapsing them into one generic path error.
 
 ## Packaging Guardrails
 
