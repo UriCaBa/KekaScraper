@@ -65,6 +65,7 @@ This project is intentionally local-first:
 - Put browser, context, and page lifecycle under `try` / `finally` so Playwright resources are always cleaned up.
 - Cleanup code must not mask successful scrape results. Use tolerant teardown patterns such as `Promise.allSettled(...)` or guarded closes.
 - Prevent default form submission synchronously during renderer bootstrap. Do not wait for async defaults before attaching the submit guard.
+- During async bootstrap, disable the whole form, not just the submit button. Otherwise late-loaded defaults/preferences can overwrite user edits made before initialization completes.
 - Validate parsed form state before flipping the desktop UI into a running or disabled state.
 - Keep frontend constraints aligned with backend behavior. If the backend requires at least one format or one valid city, the UI must enforce the same rule explicitly.
 - When a UI temporarily disables inputs during a run, restore any dynamic validation or checkbox guards when the form becomes interactive again.

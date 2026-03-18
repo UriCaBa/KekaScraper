@@ -45,6 +45,7 @@ const elements = {
 
 elements.runButton.disabled = true;
 elements.runButton.textContent = 'Loading...';
+setFormDisabled(true);
 elements.form.addEventListener('submit', (event) => {
   event.preventDefault();
   if (!state.initialized || state.formDisabled) {
