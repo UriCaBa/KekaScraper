@@ -1,4 +1,3 @@
-import process from 'node:process';
 import { chromium } from 'playwright';
 
 export async function launchBrowser(options) {
