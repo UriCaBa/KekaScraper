@@ -75,7 +75,10 @@ async function bootstrap() {
 
   elements.openOutputFolderButton.addEventListener('click', async () => {
     if (state.outputDirectory) {
-      await window.kekaApp.openOutputFolder();
+      await runUiAction(
+        () => window.kekaApp.openOutputFolder(),
+        'Failed to open the output folder',
+      );
     }
   });
 
@@ -312,6 +315,18 @@ function appendLog(message, tone = 'info') {
   renderStatus();
 }
 
+async function runUiAction(action, failureLabel) {
+  try {
+    await action();
+  } catch (error) {
+    const message = error?.message ?? failureLabel;
+    appendLog(`${failureLabel}: ${message}`, 'error');
+    elements.statusCopy.textContent = message;
+    elements.statusPhase.textContent = 'Error';
+    renderStatus();
+  }
+}
+
 function buildCompletionMessage(summary) {
   const fileCount = summary.outputFiles.length;
   return `Run ${summary.outcome}. ${summary.totalResults} rows exported to ${fileCount} ${fileCount === 1 ? 'file' : 'files'}.`;
@@ -430,7 +445,10 @@ function renderOutputFiles() {
     button.className = 'secondary output-file';
     button.textContent = fileName;
     button.addEventListener('click', async () => {
-      await window.kekaApp.openOutputFile(filePath);
+      await runUiAction(
+        () => window.kekaApp.openOutputFile(filePath),
+        `Failed to open ${fileName}`,
+      );
     });
     fragment.append(button);
   }
@@ -456,7 +474,10 @@ function createWebsiteCell(url) {
   button.className = 'secondary external-link';
   button.textContent = safeUrl;
   button.addEventListener('click', async () => {
-    await window.kekaApp.openExternalUrl(safeUrl);
+    await runUiAction(
+      () => window.kekaApp.openExternalUrl(safeUrl),
+      `Failed to open ${safeUrl}`,
+    );
   });
   cell.append(button);
   return cell;

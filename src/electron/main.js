@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { defaultConfig } from '../config.js';
 import { savePreferences, loadPreferences } from './preferences.js';
-import { normalizeBrowserChannel, normalizeFormats, normalizeInteger } from '../lib/run-options.js';
+import { normalizeBoolean, normalizeBrowserChannel, normalizeFormats, normalizeInteger } from '../lib/run-options.js';
 import { runScrape } from '../lib/run-scrape.js';
 import { splitCities } from '../lib/utils.js';
 
@@ -199,8 +199,8 @@ function normalizeFormState(rawFormState = {}) {
     resultLimit: normalizeInteger(rawFormState.resultLimit, defaultConfig.resultLimit, 'resultLimit'),
     formats,
     browserChannel,
-    headful: Boolean(rawFormState.headful),
-    enrichWebsite: rawFormState.enrichWebsite !== false,
+    headful: normalizeBoolean(rawFormState.headful, !defaultConfig.headless),
+    enrichWebsite: normalizeBoolean(rawFormState.enrichWebsite, defaultConfig.enrichWebsite),
     websitePageLimit: normalizeInteger(
       rawFormState.websitePageLimit,
       defaultConfig.websitePageLimit,

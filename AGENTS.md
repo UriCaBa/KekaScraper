@@ -65,9 +65,11 @@ This project is intentionally local-first:
 - Normalize persisted preferences before hydrating the UI. Treat the local preferences file as untrusted input and fall back field-by-field.
 - Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
 - Do not promote placeholder tokens such as `null`, `undefined`, or `n/a` into public URLs. Scheme-less URL normalization should require a plausible hostname.
+- Catch rejected IPC calls in renderer event handlers and surface them in visible UI state/logs instead of leaving unhandled promise rejections.
 - When the UI shows derived counts for cities or rows, use the same normalization rules as the backend so progress copy and final results stay consistent.
 - If the renderer cannot import a backend helper directly, mirror the backend parsing logic in a small, clearly named helper instead of open-coding a “close enough” variant.
 - Validate critical renderer inputs again in Electron main using the same parsing rules as the shared backend, not just simple non-empty string checks.
+- Treat renderer-provided booleans as untrusted input too. Coerce only real booleans and otherwise fall back to defaults.
 - Keep URL normalization consistent across display and enrichment paths. If scheme-less hostnames are accepted in the UI, the backend should normalize them too.
 - Avoid `innerHTML` for interactive controls that carry real data in attributes. Prefer DOM creation with `textContent`, closures, or `dataset` set via DOM APIs.
 - Final desktop UI state should reconcile from the returned scrape summary, not rely exclusively on streamed IPC progress events.
