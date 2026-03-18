@@ -17,8 +17,9 @@ export async function launchBrowser(options) {
   const launchCandidates = getLaunchCandidates(browserChannel, { allowBundledChromium });
 
   if (launchCandidates.length === 0) {
+    const chromiumDisabledReason = describeBundledChromiumDisabledReason({ browserChannel, allowBundledChromium });
     throw new Error(
-      'Bundled Chromium is not available in packaged desktop builds. Use Auto, Microsoft Edge, or Google Chrome.',
+      `Bundled Chromium is unavailable for requested browser channel "${browserChannel}". ${chromiumDisabledReason}`,
     );
   }
 
@@ -121,4 +122,16 @@ function formatChannelLabel(channel) {
     default:
       return channel;
   }
+}
+
+function describeBundledChromiumDisabledReason({ browserChannel, allowBundledChromium }) {
+  if (browserChannel !== 'chromium') {
+    return 'Use Auto, Microsoft Edge, or Google Chrome instead.';
+  }
+
+  if (!allowBundledChromium) {
+    return 'Bundled Chromium is disabled by the current runtime configuration.';
+  }
+
+  return 'Bundled Chromium is not available in the current runtime configuration.';
 }

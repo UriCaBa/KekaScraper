@@ -59,6 +59,7 @@ This project is intentionally local-first:
 - If shared option parsing accepts both string and array inputs, apply the same whitespace normalization and de-duplication rules in both paths.
 - When refactoring the CLI to call a shared engine, preserve actionable console diagnostics such as per-city failures instead of relying only on the final exit code.
 - If a library stops writing warnings directly to stderr and emits structured events instead, update the CLI surface to log the new failure events so enrichment/debugging diagnostics are not lost.
+- When logging shared failure events in the CLI, always fall back from optional human labels to another identifier such as `website` or a generic placeholder so diagnostics stay actionable even with partial payloads.
 - Before sending IPC events from Electron main to renderer, guard against destroyed windows and destroyed `webContents`.
 - Treat `shell.openPath()` as fallible. Check its returned error string and convert failures into explicit errors instead of assuming success.
 - Put browser, context, and page lifecycle under `try` / `finally` so Playwright resources are always cleaned up.
@@ -93,6 +94,7 @@ This project is intentionally local-first:
 - If a boundary helper normalizes a config value such as `outputDir`, write that normalized value back into the config object you return so callers, events, and summaries stay consistent.
 - If a browser/channel label is user-visible in the CLI or desktop UI, emit a friendly product name such as `Microsoft Edge` instead of raw internal channel ids.
 - Keep friendly browser labels complete for every supported channel, including fallback cases such as `Chromium`, instead of formatting only the most common ones.
+- If browser availability depends on runtime config, keep launch errors configuration-aware. Do not hardcode a packaged-build explanation when the real reason is simply that bundled Chromium was disabled.
 - Shared engine and library layers should not write directly to stdout/stderr for routine progress. Surface progress and warnings through hooks/events so each surface decides what to render.
 - When a surface consumes shared engine events, keep the renderer/CLI handler aligned with the event payload contract and smoke-test the path after renaming payload fields.
 - If the shared engine stamps event metadata such as `timestamp`, set that metadata after spreading caller-provided fields so upstream payloads cannot overwrite it accidentally.

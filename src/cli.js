@@ -35,7 +35,7 @@ function handleCliEvent(event) {
       console.log(`[enrich] Starting website enrichment for ${event.totalListings} listings`);
       break;
     case 'enrichment-item-failed':
-      console.error(`[enrich-failed] ${event.name}: ${event.message}`);
+      console.error(`[enrich-failed] ${describeEnrichmentTarget(event)}: ${event.message}`);
       break;
     case 'city-failed':
       console.error(`[city-failed] ${event.city}: ${event.message}`);
@@ -131,6 +131,10 @@ function expectValue(argv, index, flagName) {
 
 function parseInteger(value, flagName, options = {}) {
   return normalizeInteger(value, undefined, flagName, options);
+}
+
+function describeEnrichmentTarget(event) {
+  return event.name ?? event.website ?? 'listing without website';
 }
 
 function printHelp() {
