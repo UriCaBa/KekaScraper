@@ -1,5 +1,5 @@
 import { defaultConfig } from '../config.js';
-import { splitCities } from './utils.js';
+import { normalizeWhitespace, splitCities } from './utils.js';
 
 export const ALLOWED_BROWSER_CHANNELS = ['auto', 'msedge', 'chrome', 'chromium'];
 export const ALLOWED_OUTPUT_FORMATS = ['json', 'csv'];
@@ -95,5 +95,5 @@ export function normalizeFormats(value) {
 
 function normalizeCities(value) {
   const items = Array.isArray(value) ? value : (value ? splitCities([`${value}`]) : []);
-  return [...new Set(items.map((item) => `${item}`.trim()).filter(Boolean))];
+  return [...new Set(items.map((item) => normalizeWhitespace(String(item))).filter(Boolean))];
 }

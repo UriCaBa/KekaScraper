@@ -12,18 +12,22 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
   const startedAt = new Date();
   const runConfig = normalizeRunOptions(inputOptions, { requireCities: true });
   const outputDir = normalizeOutputDir(runConfig.outputDir);
+  const normalizedRunConfig = {
+    ...runConfig,
+    outputDir,
+  };
 
   emit({
     type: 'run-started',
     startedAt: startedAt.toISOString(),
-    cities: runConfig.cities,
+    cities: normalizedRunConfig.cities,
     outputDirectory: outputDir,
   });
 
-  const { browser, context, launchSummary } = await launchBrowser(runConfig);
+  const { browser, context, launchSummary } = await launchBrowser(normalizedRunConfig);
   emit({
     type: 'browser-ready',
-    requestedBrowserChannel: runConfig.browserChannel,
+    requestedBrowserChannel: normalizedRunConfig.browserChannel,
     selectedBrowserLabel: launchSummary.selectedCandidateLabel,
   });
 
@@ -34,23 +38,23 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     const page = await context.newPage();
     const detailPage = await context.newPage();
 
-    for (const [index, city] of runConfig.cities.entries()) {
+    for (const [index, city] of normalizedRunConfig.cities.entries()) {
       emit({
         type: 'city-started',
         city,
         index: index + 1,
-        totalCities: runConfig.cities.length,
+        totalCities: normalizedRunConfig.cities.length,
       });
 
       try {
         const cityResults = await scrapeCity(page, detailPage, {
           city,
-          queryPrefix: runConfig.queryPrefix,
-          resultLimit: runConfig.resultLimit,
-          maxScrollRounds: runConfig.maxScrollRounds,
-          retryCount: runConfig.retryCount,
-          retryDelayMs: runConfig.retryDelayMs,
-          detailPauseMs: runConfig.detailPauseMs,
+          queryPrefix: normalizedRunConfig.queryPrefix,
+          resultLimit: normalizedRunConfig.resultLimit,
+          maxScrollRounds: normalizedRunConfig.maxScrollRounds,
+          retryCount: normalizedRunConfig.retryCount,
+          retryDelayMs: normalizedRunConfig.retryDelayMs,
+          detailPauseMs: normalizedRunConfig.detailPauseMs,
         });
 
         allResults.push(...cityResults);
@@ -58,7 +62,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
           type: 'city-completed',
           city,
           index: index + 1,
-          totalCities: runConfig.cities.length,
+          totalCities: normalizedRunConfig.cities.length,
           cityResultCount: cityResults.length,
           totalResultCount: allResults.length,
         });
@@ -68,7 +72,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
           type: 'city-failed',
           city,
           index: index + 1,
-          totalCities: runConfig.cities.length,
+          totalCities: normalizedRunConfig.cities.length,
           message: error.message,
         });
       }
@@ -81,13 +85,13 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
   }
 
   let finalResults = allResults;
-  if (runConfig.enrichWebsite) {
+  if (normalizedRunConfig.enrichWebsite) {
     emit({
       type: 'enrichment-started',
       totalListings: allResults.length,
     });
 
-    finalResults = await enrichListings(allResults, runConfig, {
+    finalResults = await enrichListings(allResults, normalizedRunConfig, {
       onEvent: emit,
     });
   }
@@ -96,14 +100,14 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
   const outputFiles = await writeOutputs(finalResults, {
     outputDir,
     baseFilename,
-    formats: runConfig.formats,
+    formats: normalizedRunConfig.formats,
   });
 
   const finishedAt = new Date();
   const summary = buildSummary({
     startedAt,
     finishedAt,
-    runConfig,
+    runConfig: normalizedRunConfig,
     outputDir,
     cityFailures,
     totalResults: finalResults.length,
@@ -117,7 +121,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
   });
 
   return {
-    config: runConfig,
+    config: normalizedRunConfig,
     summary,
     results: finalResults,
     outputFiles,

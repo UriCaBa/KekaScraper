@@ -55,6 +55,7 @@ This project is intentionally local-first:
 - Create required output directories before opening or writing to them instead of assuming they already exist.
 - For critical shared config such as `outputDir`, normalize once near the boundary and reuse the normalized local value across events, exports, and summaries.
 - When adding a local normalization helper around shared config, import its fallback source explicitly and return the normalized value itself, not the raw pre-trimmed input.
+- If shared option parsing accepts both string and array inputs, apply the same whitespace normalization and de-duplication rules in both paths.
 - When refactoring the CLI to call a shared engine, preserve actionable console diagnostics such as per-city failures instead of relying only on the final exit code.
 - Before sending IPC events from Electron main to renderer, guard against destroyed windows and destroyed `webContents`.
 - Treat `shell.openPath()` as fallible. Check its returned error string and convert failures into explicit errors instead of assuming success.
@@ -71,16 +72,17 @@ This project is intentionally local-first:
 - Catch rejected IPC calls in renderer event handlers and surface them in visible UI state/logs instead of leaving unhandled promise rejections.
 - Keep renderer rendering explicit on hot paths. State helpers such as `appendLog()` should not hide DOM work if the caller already owns the render cadence.
 - When the UI shows derived counts for cities or rows, use the same normalization rules as the backend so progress copy and final results stay consistent.
-- If the renderer cannot import a backend helper directly, mirror the backend parsing logic in a small, clearly named helper instead of open-coding a “close enough” variant.
+- If the renderer cannot import a backend helper directly, mirror the backend parsing logic in a small, clearly named helper instead of open-coding a "close enough" variant.
 - Validate critical renderer inputs again in Electron main using the same parsing rules as the shared backend, not just simple non-empty string checks.
 - Treat renderer-provided booleans as untrusted input too. Coerce only real booleans and otherwise fall back to defaults.
 - Keep URL normalization consistent across display and enrichment paths. If scheme-less hostnames are accepted in the UI, the backend should normalize them too.
 - Avoid `innerHTML` for interactive controls that carry real data in attributes. Prefer DOM creation with `textContent`, closures, or `dataset` set via DOM APIs.
 - Final desktop UI state should reconcile from the returned scrape summary, not rely exclusively on streamed IPC progress events.
-- Distinguish “no run yet” from “run completed with 0 rows” in the results area so exported files remain accessible after empty runs.
+- Distinguish "no run yet" from "run completed with 0 rows" in the results area so exported files remain accessible after empty runs.
 - Separate path containment checks from file-existence checks so missing files return accurate errors instead of looking like boundary violations.
-- For local file-opening actions, distinguish clearly between “outside allowed boundary”, “output directory missing”, and “file missing” instead of collapsing them into one generic path error.
-- In run summaries, prioritize failure signal over “empty results” signal so partial failures with zero rows are still reported as partial rather than plain empty.
+- For local file-opening actions, distinguish clearly between "outside allowed boundary", "output directory missing", and "file missing" instead of collapsing them into one generic path error.
+- In run summaries, prioritize failure signal over "empty results" signal so partial failures with zero rows are still reported as partial rather than plain empty.
+- If a boundary helper normalizes a config value such as `outputDir`, write that normalized value back into the config object you return so callers, events, and summaries stay consistent.
 
 ## Packaging Guardrails
 
