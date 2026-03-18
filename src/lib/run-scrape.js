@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { defaultConfig } from '../config.js';
 import { launchBrowser } from './browser.js';
 import { writeOutputs } from './exporters.js';
 import { scrapeCity } from './maps.js';
@@ -175,6 +176,6 @@ function buildSummary({ startedAt, finishedAt, runConfig, outputDir, cityFailure
 
 function normalizeOutputDir(value) {
   return typeof value === 'string' && value.trim()
-    ? value
+    ? value.trim()
     : defaultConfig.outputDir;
 }
