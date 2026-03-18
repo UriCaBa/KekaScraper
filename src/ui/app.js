@@ -1,6 +1,7 @@
 const state = {
   outputDirectory: '',
   running: false,
+  formDisabled: false,
   totalResults: 0,
   completedCities: 0,
   totalCities: 0,
@@ -262,6 +263,8 @@ function readFormState() {
 }
 
 function setFormDisabled(disabled) {
+  state.formDisabled = disabled;
+
   for (const element of [
     elements.cities,
     elements.resultLimit,
@@ -293,12 +296,7 @@ function buildCompletionMessage(summary) {
 }
 
 function countCities(citiesText) {
-  return new Set(
-    citiesText
-      .split(/[\n,;]+/g)
-      .map((entry) => normalizeInputToken(entry))
-      .filter(Boolean),
-  ).size;
+  return new Set(splitCityEntries(citiesText)).size;
 }
 
 function formatDuration(durationMs) {
@@ -354,7 +352,7 @@ function normalizePotentialUrl(value) {
 }
 
 function syncFormatSelection() {
-  if (state.running) {
+  if (state.formDisabled) {
     for (const checkbox of elements.formatCheckboxes) {
       checkbox.disabled = true;
     }
@@ -434,4 +432,11 @@ function createWebsiteCell(url) {
 
 function normalizeInputToken(value) {
   return `${value ?? ''}`.replace(/\s+/g, ' ').trim();
+}
+
+function splitCityEntries(value) {
+  return [`${value ?? ''}`]
+    .flatMap((entry) => entry.split(/[,\n;]+/))
+    .map((entry) => normalizeInputToken(entry))
+    .filter(Boolean);
 }
