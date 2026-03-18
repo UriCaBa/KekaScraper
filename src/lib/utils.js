@@ -178,7 +178,12 @@ export function normalizeUrl(value) {
   }
 
   try {
-    return new URL(value).toString();
+    const parsed = new URL(normalizePotentialUrl(value));
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+
+    return parsed.toString();
   } catch {
     return null;
   }
@@ -186,6 +191,19 @@ export function normalizeUrl(value) {
 
 export function uniqueNonEmpty(values) {
   return [...new Set(values.map((value) => normalizeWhitespace(String(value))).filter(Boolean))];
+}
+
+function normalizePotentialUrl(value) {
+  const trimmedValue = normalizeWhitespace(String(value));
+  if (!trimmedValue) {
+    return '';
+  }
+
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  return `https://${trimmedValue}`;
 }
 
 function repairMojibake(value) {

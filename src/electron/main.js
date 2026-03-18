@@ -7,6 +7,7 @@ import { defaultConfig } from '../config.js';
 import { savePreferences, loadPreferences } from './preferences.js';
 import { normalizeBrowserChannel, normalizeFormats, normalizeInteger } from '../lib/run-options.js';
 import { runScrape } from '../lib/run-scrape.js';
+import { splitCities } from '../lib/utils.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(currentDir, '..', '..');
@@ -120,7 +121,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle('scrape:open-output-folder', async () => {
     await mkdir(getDesktopOutputDirectory(), { recursive: true });
-    return shell.openPath(getDesktopOutputDirectory());
+    const result = await shell.openPath(getDesktopOutputDirectory());
+    if (result) {
+      throw new Error(result);
+    }
   });
 
   ipcMain.handle('scrape:open-output-file', async (_, filePath) => {
@@ -128,7 +132,10 @@ function registerIpcHandlers() {
       throw new Error('The requested file is outside the allowed output directory.');
     }
 
-    return shell.openPath(filePath);
+    const result = await shell.openPath(filePath);
+    if (result) {
+      throw new Error(result);
+    }
   });
 }
 
@@ -154,6 +161,10 @@ function normalizeFormState(rawFormState = {}) {
 
   if (!citiesText) {
     throw new Error('Add at least one city before starting the scrape.');
+  }
+
+  if (splitCities([citiesText]).length === 0) {
+    throw new Error('Add at least one valid city before starting the scrape.');
   }
 
   if (app.isPackaged && browserChannel === 'chromium') {
@@ -223,5 +234,9 @@ function sendScrapeEvent(event) {
     return;
   }
 
-  mainWindow.webContents.send('scrape:event', event);
+  try {
+    mainWindow.webContents.send('scrape:event', event);
+  } catch {
+    // Ignore renderer delivery failures while a scrape continues in the main process.
+  }
 }

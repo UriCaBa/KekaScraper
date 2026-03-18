@@ -54,6 +54,7 @@ This project is intentionally local-first:
 - Validate local file access against the allowed output directory in the main process, using canonical paths where the boundary matters.
 - Create required output directories before opening or writing to them instead of assuming they already exist.
 - Before sending IPC events from Electron main to renderer, guard against destroyed windows and destroyed `webContents`.
+- Treat `shell.openPath()` as fallible. Check its returned error string and convert failures into explicit errors instead of assuming success.
 - Put browser, context, and page lifecycle under `try` / `finally` so Playwright resources are always cleaned up.
 - Cleanup code must not mask successful scrape results. Use tolerant teardown patterns such as `Promise.allSettled(...)` or guarded closes.
 - Validate parsed form state before flipping the desktop UI into a running or disabled state.
@@ -61,6 +62,8 @@ This project is intentionally local-first:
 - When a UI temporarily disables inputs during a run, restore any dynamic validation or checkbox guards when the form becomes interactive again.
 - Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
 - When the UI shows derived counts for cities or rows, use the same normalization rules as the backend so progress copy and final results stay consistent.
+- Validate critical renderer inputs again in Electron main using the same parsing rules as the shared backend, not just simple non-empty string checks.
+- Keep URL normalization consistent across display and enrichment paths. If scheme-less hostnames are accepted in the UI, the backend should normalize them too.
 
 ## Packaging Guardrails
 
