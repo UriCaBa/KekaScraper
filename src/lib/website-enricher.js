@@ -96,7 +96,6 @@ export async function enrichListings(listings, options, hooks = {}) {
     }
 
     try {
-      console.log(`[enrich] ${index + 1}/${listings.length} ${listing.website}`);
       const enrichment = await retry(
         () => enrichFromWebsite(listing, options),
         {
@@ -118,7 +117,6 @@ export async function enrichListings(listings, options, hooks = {}) {
         website: listing.website ?? null,
       });
     } catch (error) {
-      console.warn(`[warn] Website enrichment failed for ${listing.website}: ${error.message}`);
       enriched.push(withDefaultEnrichment(listing, {
         websiteScanStatus: 'failed',
       }));

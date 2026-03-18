@@ -87,6 +87,8 @@ This project is intentionally local-first:
 - In run summaries, prioritize failure signal over "empty results" signal so partial failures with zero rows are still reported as partial rather than plain empty.
 - If a boundary helper normalizes a config value such as `outputDir`, write that normalized value back into the config object you return so callers, events, and summaries stay consistent.
 - If a browser/channel label is user-visible in the CLI or desktop UI, emit a friendly product name such as `Microsoft Edge` instead of raw internal channel ids.
+- Shared engine and library layers should not write directly to stdout/stderr for routine progress. Surface progress and warnings through hooks/events so each surface decides what to render.
+- If the shared engine stamps event metadata such as `timestamp`, set that metadata after spreading caller-provided fields so upstream payloads cannot overwrite it accidentally.
 
 ## Packaging Guardrails
 

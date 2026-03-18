@@ -136,8 +136,8 @@ function createEmitter(onEvent) {
   return (event) => {
     try {
       onEvent({
-        timestamp: new Date().toISOString(),
         ...event,
+        timestamp: new Date().toISOString(),
       });
     } catch {
       // Ignore observer errors so the scraper can continue.
