@@ -1,0 +1,22 @@
+{
+  "name": "kekascraper",
+  "version": "1.0.0",
+  "description": "Reusable Google Maps hostel scraper for one or more cities.",
+  "type": "module",
+  "main": "src/cli.js",
+  "scripts": {
+    "scrape": "node src/cli.js",
+    "smoke": "node src/cli.js --cities \"Barcelona\" --limit 3 --formats json,csv"
+  },
+  "keywords": [
+    "scraper",
+    "google-maps",
+    "playwright",
+    "hostels"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
+}
