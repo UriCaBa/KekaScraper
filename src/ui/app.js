@@ -51,9 +51,13 @@ async function bootstrap() {
   renderStatus();
 
   elements.form.addEventListener('submit', handleSubmit);
+  for (const checkbox of elements.formatCheckboxes) {
+    checkbox.addEventListener('change', syncFormatSelection);
+  }
+
   elements.openOutputFolderButton.addEventListener('click', async () => {
     if (state.outputDirectory) {
-      await window.kekaApp.openOutputFolder(state.outputDirectory);
+      await window.kekaApp.openOutputFolder();
     }
   });
 
@@ -65,7 +69,17 @@ async function bootstrap() {
 async function handleSubmit(event) {
   event.preventDefault();
 
-  const payload = readFormState();
+  let payload;
+  try {
+    payload = readFormState();
+  } catch (error) {
+    appendLog(error.message, 'error');
+    elements.statusCopy.textContent = error.message;
+    elements.statusPhase.textContent = 'Error';
+    renderStatus();
+    return;
+  }
+
   state.running = true;
   state.logs = [];
   state.results = [];
@@ -209,6 +223,12 @@ function renderResults() {
       await window.kekaApp.openOutputFile(button.dataset.path);
     });
   }
+
+  for (const button of elements.resultsTableBody.querySelectorAll('.external-link')) {
+    button.addEventListener('click', async () => {
+      await window.kekaApp.openExternalUrl(button.dataset.url);
+    });
+  }
 }
 
 function populateForm(formState) {
@@ -223,12 +243,18 @@ function populateForm(formState) {
   for (const checkbox of elements.formatCheckboxes) {
     checkbox.checked = selectedFormats.has(checkbox.value);
   }
+
+  syncFormatSelection();
 }
 
 function readFormState() {
   const selectedFormats = elements.formatCheckboxes
     .filter((checkbox) => checkbox.checked)
     .map((checkbox) => checkbox.value);
+
+  if (selectedFormats.length === 0) {
+    throw new Error('Select at least one output format before starting the scrape.');
+  }
 
   return {
     citiesText: elements.cities.value,
@@ -255,7 +281,7 @@ function setFormDisabled(disabled) {
   }
 
   elements.runButton.disabled = disabled;
-  elements.runButton.textContent = disabled ? 'Running…' : 'Start scrape';
+  elements.runButton.textContent = disabled ? 'Running...' : 'Start scrape';
 }
 
 function appendLog(message, tone = 'info') {
@@ -291,12 +317,13 @@ function formatDuration(durationMs) {
 }
 
 function renderLinkCell(url) {
-  if (!url) {
+  const safeUrl = sanitizeExternalUrl(url);
+  if (!safeUrl) {
     return '';
   }
 
-  const safeUrl = escapeHtml(url);
-  return `<a href="${safeUrl}" target="_blank" rel="noreferrer">${safeUrl}</a>`;
+  const escapedUrl = escapeHtml(safeUrl);
+  return `<button type="button" class="secondary external-link" data-url="${escapedUrl}">${escapedUrl}</button>`;
 }
 
 function escapeHtml(value) {
@@ -306,4 +333,32 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function sanitizeExternalUrl(value) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function syncFormatSelection() {
+  const checkedCount = elements.formatCheckboxes.filter((checkbox) => checkbox.checked).length;
+  const lastChecked = checkedCount === 1
+    ? elements.formatCheckboxes.find((checkbox) => checkbox.checked)
+    : null;
+
+  for (const checkbox of elements.formatCheckboxes) {
+    checkbox.disabled = !state.running && checkedCount === 1 && checkbox === lastChecked;
+  }
 }

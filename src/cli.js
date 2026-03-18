@@ -64,7 +64,7 @@ function parseArgs(argv) {
         options.headless = true;
         break;
       case '--slow-mo':
-        options.slowMo = parseInteger(expectValue(argv, index, arg), arg);
+        options.slowMo = parseInteger(expectValue(argv, index, arg), arg, { min: 0 });
         index += 1;
         break;
       case '--max-scroll-rounds':
@@ -109,8 +109,8 @@ function expectValue(argv, index, flagName) {
   return value;
 }
 
-function parseInteger(value, flagName) {
-  return normalizeInteger(value, undefined, flagName);
+function parseInteger(value, flagName, options = {}) {
+  return normalizeInteger(value, undefined, flagName, options);
 }
 
 function printHelp() {

@@ -46,6 +46,23 @@ function createMainWindow() {
     },
   });
 
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url)) {
+      void shell.openExternal(url);
+    }
+
+    return { action: 'deny' };
+  });
+
+  window.webContents.on('will-navigate', (event, url) => {
+    if (url !== window.webContents.getURL()) {
+      event.preventDefault();
+      if (isSafeExternalUrl(url)) {
+        void shell.openExternal(url);
+      }
+    }
+  });
+
   window.loadFile(uiEntryPath);
   return window;
 }
@@ -59,6 +76,14 @@ function registerIpcHandlers() {
       outputDirectory: getDesktopOutputDirectory(),
       appVersion: app.getVersion(),
     };
+  });
+
+  ipcMain.handle('app:open-external-url', async (_, url) => {
+    if (!isSafeExternalUrl(url)) {
+      throw new Error('Only http and https links can be opened.');
+    }
+
+    await shell.openExternal(url);
   });
 
   ipcMain.handle('scrape:start', async (_, rawFormState) => {
@@ -90,11 +115,15 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('scrape:open-output-folder', async (_, folderPath) => {
-    return shell.openPath(folderPath);
+  ipcMain.handle('scrape:open-output-folder', async () => {
+    return shell.openPath(getDesktopOutputDirectory());
   });
 
   ipcMain.handle('scrape:open-output-file', async (_, filePath) => {
+    if (!isPathInsideOutputDirectory(filePath)) {
+      throw new Error('The requested file is outside the allowed output directory.');
+    }
+
     return shell.openPath(filePath);
   });
 }
@@ -151,4 +180,25 @@ function buildRunConfig(formState) {
 
 function getDesktopOutputDirectory() {
   return path.join(app.getPath('documents'), 'KekaScraper', 'output');
+}
+
+function isSafeExternalUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isPathInsideOutputDirectory(candidatePath) {
+  if (!candidatePath) {
+    return false;
+  }
+
+  const outputDirectory = path.resolve(getDesktopOutputDirectory());
+  const resolvedCandidate = path.resolve(candidatePath);
+  const relativePath = path.relative(outputDirectory, resolvedCandidate);
+
+  return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
 }
