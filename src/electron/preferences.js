@@ -17,11 +17,12 @@ export async function loadPreferences(userDataDir, fallbackState) {
 
 export async function savePreferences(userDataDir, nextState) {
   await fs.mkdir(userDataDir, { recursive: true });
-  await fs.writeFile(
-    getPreferencesPath(userDataDir),
-    `${JSON.stringify(nextState, null, 2)}\n`,
-    'utf8',
-  );
+  const preferencesPath = getPreferencesPath(userDataDir);
+  const tempPath = `${preferencesPath}.tmp`;
+  const serializedState = `${JSON.stringify(nextState, null, 2)}\n`;
+
+  await fs.writeFile(tempPath, serializedState, 'utf8');
+  await fs.rename(tempPath, preferencesPath);
 }
 
 function getPreferencesPath(userDataDir) {

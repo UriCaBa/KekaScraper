@@ -50,6 +50,7 @@ This project is intentionally local-first:
 
 - Do not trust renderer input in Electron. Validate URLs, file paths, and user-provided values again in the main process.
 - Keep Electron secure by default: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, and deny unexpected navigations or new windows.
+- Add a renderer Content Security Policy in local HTML entrypoints instead of relying only on Electron defaults for XSS hardening.
 - Open external links only through a safe main-process bridge and only for `http` / `https` URLs.
 - Validate local file access against the allowed output directory in the main process, using canonical paths where the boundary matters.
 - Create required output directories before opening or writing to them instead of assuming they already exist.
@@ -67,6 +68,7 @@ This project is intentionally local-first:
 - When a UI temporarily disables inputs during a run, restore any dynamic validation or checkbox guards when the form becomes interactive again.
 - Do not let follow-up UI helpers accidentally re-enable controls that were intentionally disabled for a running job.
 - Normalize persisted preferences before hydrating the UI. Treat the local preferences file as untrusted input and fall back field-by-field.
+- Persist local preferences atomically when practical: write to a temp file in the same directory and rename it into place instead of overwriting the final JSON path directly.
 - Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
 - When accepting scheme-less website inputs, do not treat a plain `host:port` token as an already-schemed URL. Only treat explicit `http://` or `https://` values as pre-schemed.
 - Do not promote placeholder tokens such as `null`, `undefined`, or `n/a` into public URLs. Scheme-less URL normalization should require a plausible hostname.
