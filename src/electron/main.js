@@ -282,7 +282,12 @@ async function validateOutputFilePath(candidatePath) {
     const resolvedCandidate = await resolveCanonicalCandidatePath(candidatePath);
     const relativePath = path.relative(outputDirectory, resolvedCandidate);
 
-    if (relativePath === '' || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    if (
+      relativePath === ''
+      || relativePath === '..'
+      || relativePath.startsWith(`..${path.sep}`)
+      || path.isAbsolute(relativePath)
+    ) {
       return { ok: false, message: 'The requested file is outside the allowed output directory.' };
     }
 

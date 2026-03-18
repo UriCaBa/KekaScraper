@@ -84,6 +84,7 @@ This project is intentionally local-first:
 - Distinguish "no run yet" from "run completed with 0 rows" in the results area so exported files remain accessible after empty runs.
 - Separate path containment checks from file-existence checks so missing files return accurate errors instead of looking like boundary violations.
 - For local file-opening actions, distinguish clearly between "outside allowed boundary", "output directory missing", and "file missing" instead of collapsing them into one generic path error.
+- When checking directory containment with `path.relative()`, do not reject every path that merely starts with `..` as a string. Match real parent traversal (`'..'` or `'..' + path.sep`) so filenames like `..notes.txt` are still treated correctly.
 - In run summaries, prioritize failure signal over "empty results" signal so partial failures with zero rows are still reported as partial rather than plain empty.
 - If a boundary helper normalizes a config value such as `outputDir`, write that normalized value back into the config object you return so callers, events, and summaries stay consistent.
 - If a browser/channel label is user-visible in the CLI or desktop UI, emit a friendly product name such as `Microsoft Edge` instead of raw internal channel ids.
