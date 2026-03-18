@@ -59,6 +59,7 @@ This project is intentionally local-first:
 - If shared option parsing accepts both string and array inputs, apply the same whitespace normalization and de-duplication rules in both paths.
 - Do not blindly apply delimiter splitting to array-based option inputs. Repeated flags such as `--city` should keep each provided value atomic unless the caller explicitly used the delimited string form.
 - Treat city parsing as a product contract, not a generic CSV parser. City lists should split on newline or semicolon, while commas must stay available inside a single city token such as `Paris, France`.
+- Do not reuse city-specific splitters for unrelated list inputs such as output formats. Keep a generic comma-aware splitter for things like `json,csv`, and protect both contracts with explicit shared tests.
 - When refactoring the CLI to call a shared engine, preserve actionable console diagnostics such as per-city failures instead of relying only on the final exit code.
 - If a library stops writing warnings directly to stderr and emits structured events instead, update the CLI surface to log the new failure events so enrichment/debugging diagnostics are not lost.
 - When logging shared failure events in the CLI, always fall back from optional human labels to another identifier such as `website` or a generic placeholder so diagnostics stay actionable even with partial payloads.

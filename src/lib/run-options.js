@@ -1,6 +1,6 @@
 import { defaultConfig } from '../config.js';
 import { normalizeWhitespace } from './utils.js';
-import { splitCityInput } from '../shared/input-normalization.js';
+import { splitCityInput, splitDelimitedValues } from '../shared/input-normalization.js';
 
 export const ALLOWED_BROWSER_CHANNELS = ['auto', 'msedge', 'chrome', 'chromium'];
 export const ALLOWED_OUTPUT_FORMATS = ['json', 'csv'];
@@ -84,7 +84,7 @@ export function normalizeFormats(value) {
     return [...defaultConfig.formats];
   }
 
-  const items = splitCityInput(Array.isArray(value) ? value : [`${value}`]);
+  const items = splitDelimitedValues(Array.isArray(value) ? value : [`${value}`]);
   const normalized = [...new Set(
     items
       .map((item) => `${item}`.trim().toLowerCase())

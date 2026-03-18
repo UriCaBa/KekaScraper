@@ -37,6 +37,13 @@ const normalized = normalizeRunOptions({
 assert.deepEqual(normalized.cities, ['Barcelona', 'Bilbao', 'Donostia']);
 assert.deepEqual(normalized.formats, defaultConfig.formats);
 
+const normalizedFormats = normalizeRunOptions({
+  cities: 'Barcelona',
+  formats: 'json,csv',
+}, { requireCities: true });
+
+assert.deepEqual(normalizedFormats.formats, ['json', 'csv']);
+
 const repeatedCityFlags = normalizeRunOptions({
   cities: ['Paris, France', 'New York'],
 }, { requireCities: true });

@@ -3,6 +3,7 @@ import process from 'node:process';
 import { normalizeBrowserChannel, normalizeInteger, normalizeRunOptions } from './lib/run-options.js';
 import { RUN_EVENT_TYPES } from './lib/run-events.js';
 import { runScrape } from './lib/run-scrape.js';
+import { splitDelimitedValues } from './shared/input-normalization.js';
 import { splitCities } from './lib/utils.js';
 
 async function main() {
@@ -91,7 +92,7 @@ function parseArgs(argv) {
         index += 1;
         break;
       case '--formats':
-        options.formats = splitCities([expectValue(argv, index, arg)])
+        options.formats = splitDelimitedValues([expectValue(argv, index, arg)])
           .map((value) => value.toLowerCase())
           .filter((value) => value === 'json' || value === 'csv');
         index += 1;
