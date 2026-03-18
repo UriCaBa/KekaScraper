@@ -68,6 +68,7 @@ This project is intentionally local-first:
 - When a UI temporarily disables inputs during a run, restore any dynamic validation or checkbox guards when the form becomes interactive again.
 - Do not let follow-up UI helpers accidentally re-enable controls that were intentionally disabled for a running job.
 - Normalize persisted preferences before hydrating the UI. Treat the local preferences file as untrusted input and fall back field-by-field.
+- Never spread parsed JSON from disk directly into runtime state. Sanitize persisted objects first, ignore prototype-related keys, and only keep expected top-level preference fields.
 - Persist local preferences atomically when practical: write to a temp file in the same directory and rename it into place instead of overwriting the final JSON path directly.
 - Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
 - When accepting scheme-less website inputs, do not treat a plain `host:port` token as an already-schemed URL. Only treat explicit `http://` or `https://` values as pre-schemed.
@@ -96,6 +97,7 @@ This project is intentionally local-first:
 ## Packaging Guardrails
 
 - Keep packaged-app behavior aligned with what is actually shipped, not with local development assumptions.
+- Keep package entry semantics stable for CLI users. Do not repoint `package.json.main` at the Electron process by default; use explicit Electron scripts and `electron-builder` metadata for packaged desktop entrypoints.
 - Do not expose bundled Chromium in packaged desktop builds unless the build explicitly ships a runnable Playwright browser payload.
 - If packaging constraints force a narrower runtime contract, reflect that in the UI, runtime validation, and README at the same time.
 - Do not over-constrain `electron-builder` packaged files in a way that drops production dependencies such as `node_modules`.

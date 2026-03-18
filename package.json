@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Reusable Google Maps hostel scraper for one or more cities.",
   "type": "module",
-  "main": "src/electron/main.js",
+  "main": "src/cli.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron .",
+    "start": "electron src/electron/main.js",
+    "dev": "electron src/electron/main.js",
     "scrape": "node src/cli.js",
     "smoke": "node src/cli.js --cities \"Barcelona\" --limit 3 --formats json,csv",
     "pack": "electron-builder --dir",
@@ -31,6 +31,9 @@
     "appId": "com.uricaba.kekascraper",
     "productName": "KekaScraper",
     "asar": false,
+    "extraMetadata": {
+      "main": "src/electron/main.js"
+    },
     "files": [
       "**/*",
       "!release{,/**/*}",
