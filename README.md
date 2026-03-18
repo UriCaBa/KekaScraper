@@ -42,13 +42,14 @@ Reusable Node.js + Playwright scraper for Google Maps hostel searches by city.
 
 ## Requirements
 
-- Windows or macOS
+- Windows, macOS, or Linux
 - Node.js 22+
 - Playwright installed in this project
 - One supported Chromium-based browser available:
   - preferred: Microsoft Edge
   - fallback: Google Chrome
   - last fallback: Playwright bundled Chromium
+  - Linux is expected to use Playwright bundled Chromium unless you install a supported browser channel
 
 ## Usage
 
@@ -99,7 +100,7 @@ npm run scrape -- --cities "Barcelona" --headful
 ## Notes and limits
 
 - Google Maps DOM changes regularly. Selectors for category, reviews, address, and website are pragmatic fallbacks and may need adjustments over time.
-- Browser launch is cross-platform. By default the scraper tries Edge first, then Chrome, then bundled Chromium. You can still force a browser with `--browser-channel`.
+- Browser launch is cross-platform. By default the scraper tries Edge first, then Chrome, then bundled Chromium. On Linux, the most portable setup is usually Playwright bundled Chromium. You can still force a browser with `--browser-channel`.
 - Some listings do not expose phone, website, or category publicly.
 - Hostel filtering is heuristic and based on listing name, category, and URL signals. It reduces hotel noise, but it is not perfect.
 - Website enrichment only uses public pages from the property website. It does not rely on LinkedIn or paid APIs.

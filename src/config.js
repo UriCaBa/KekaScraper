@@ -30,9 +30,18 @@ export function getRootDir() {
 }
 
 function buildDefaultUserAgent() {
-  const platformToken = process.platform === 'darwin'
-    ? 'Macintosh; Intel Mac OS X 10_15_7'
-    : 'Windows NT 10.0; Win64; x64';
+  const platformToken = getPlatformToken();
 
   return `Mozilla/5.0 (${platformToken}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 KekaScraper/1.0`;
+}
+
+function getPlatformToken() {
+  switch (process.platform) {
+    case 'darwin':
+      return 'Macintosh; Intel Mac OS X 10_15_7';
+    case 'linux':
+      return 'X11; Linux x86_64';
+    default:
+      return 'Windows NT 10.0; Win64; x64';
+  }
 }

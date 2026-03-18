@@ -31,6 +31,7 @@ export async function launchBrowser(options) {
     throw new Error(
       `Failed to launch Playwright. Tried ${formatCandidateLabels(launchCandidates)}. ` +
       `Original error: ${launchError?.message ?? 'Unknown launch error.'}`,
+      { cause: launchError },
     );
   }
 
@@ -65,7 +66,7 @@ function getLaunchCandidates(browserChannel) {
 
 function makeChannelCandidate(channel) {
   if (channel === 'chromium') {
-    return makeBundledChromiumCandidate();
+    return makeBundledChromiumCandidate('chromium (bundled Chromium)');
   }
 
   return {
@@ -74,9 +75,9 @@ function makeChannelCandidate(channel) {
   };
 }
 
-function makeBundledChromiumCandidate() {
+function makeBundledChromiumCandidate(label = 'bundled Chromium') {
   return {
-    label: 'bundled Chromium',
+    label,
     launchOptions: {},
   };
 }
