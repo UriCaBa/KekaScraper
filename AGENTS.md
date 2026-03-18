@@ -89,6 +89,8 @@ This project is intentionally local-first:
 - If a browser/channel label is user-visible in the CLI or desktop UI, emit a friendly product name such as `Microsoft Edge` instead of raw internal channel ids.
 - Shared engine and library layers should not write directly to stdout/stderr for routine progress. Surface progress and warnings through hooks/events so each surface decides what to render.
 - If the shared engine stamps event metadata such as `timestamp`, set that metadata after spreading caller-provided fields so upstream payloads cannot overwrite it accidentally.
+- UI labels for progress counters must match the actual semantics of the underlying state. If failures are counted too, prefer wording such as `processed` over `completed`.
+- Do not send full large result sets over Electron IPC just to render a preview. Return a bounded preview slice plus summary/output paths, and let exports remain the full source of truth.
 
 ## Packaging Guardrails
 

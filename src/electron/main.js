@@ -15,6 +15,7 @@ const uiEntryPath = path.join(rootDir, 'src', 'ui', 'index.html');
 
 let mainWindow;
 let activeRunPromise = null;
+const RESULTS_PREVIEW_LIMIT = 200;
 
 app.whenReady().then(async () => {
   registerIpcHandlers();
@@ -113,7 +114,7 @@ function registerIpcHandlers() {
       const result = await activeRunPromise;
       return {
         summary: result.summary,
-        results: result.results,
+        previewResults: result.results.slice(0, RESULTS_PREVIEW_LIMIT),
         outputFiles: result.outputFiles,
       };
     } finally {

@@ -12,6 +12,7 @@ const state = {
   lastCompletedSummary: null,
 };
 
+const RESULTS_PREVIEW_LIMIT = 200;
 const INVALID_URL_HOST_TOKENS = new Set(['-', '--', 'n/a', 'na', 'nil', 'none', 'null', 'undefined', 'unknown']);
 const PUBLIC_HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 
@@ -119,7 +120,7 @@ async function handleSubmit() {
 
   try {
     const result = await window.kekaApp.startScrape(payload);
-    state.results = result.results;
+    state.results = result.previewResults ?? (result.results ?? []).slice(0, RESULTS_PREVIEW_LIMIT);
     state.outputFiles = result.outputFiles;
     state.lastCompletedSummary = result.summary;
     state.outputDirectory = result.summary.outputDirectory;
@@ -226,7 +227,11 @@ function renderResults() {
   }
 
   const rowCount = state.lastCompletedSummary.totalResults;
-  elements.resultsSummary.textContent = `${rowCount} ${rowCount === 1 ? 'row' : 'rows'}`;
+  const previewCount = state.results.length;
+  const previewLabel = rowCount > previewCount
+    ? `, showing first ${previewCount}`
+    : '';
+  elements.resultsSummary.textContent = `${rowCount} ${rowCount === 1 ? 'row' : 'rows'}${previewLabel}`;
   renderResultRows();
   renderOutputFiles();
 }
