@@ -193,45 +193,14 @@ function renderResults() {
   elements.resultsContent.hidden = !hasResults;
 
   if (!hasResults) {
-    elements.resultsTableBody.innerHTML = '';
-    elements.outputFiles.innerHTML = '';
+    elements.resultsTableBody.replaceChildren();
+    elements.outputFiles.replaceChildren();
     return;
   }
 
   elements.resultsSummary.textContent = `${state.results.length} ${state.results.length === 1 ? 'row' : 'rows'}`;
-  elements.resultsTableBody.innerHTML = state.results
-    .map((item) => {
-      return `
-        <tr>
-          <td>${escapeHtml(item.name ?? '')}</td>
-          <td>${escapeHtml(item.searchedCity ?? '')}</td>
-          <td>${renderLinkCell(item.website)}</td>
-          <td>${escapeHtml(item.generalEmail ?? '')}</td>
-          <td>${escapeHtml(item.bestContactChannel ?? '')}</td>
-          <td>${escapeHtml(item.bestContactValue ?? '')}</td>
-        </tr>
-      `;
-    })
-    .join('');
-
-  elements.outputFiles.innerHTML = state.outputFiles
-    .map((filePath) => {
-      const fileName = filePath.split(/[\\/]/).pop();
-      return `<button type="button" class="secondary output-file" data-path="${escapeHtml(filePath)}">${escapeHtml(fileName)}</button>`;
-    })
-    .join('');
-
-  for (const button of elements.outputFiles.querySelectorAll('.output-file')) {
-    button.addEventListener('click', async () => {
-      await window.kekaApp.openOutputFile(button.dataset.path);
-    });
-  }
-
-  for (const button of elements.resultsTableBody.querySelectorAll('.external-link')) {
-    button.addEventListener('click', async () => {
-      await window.kekaApp.openExternalUrl(button.dataset.url);
-    });
-  }
+  renderResultRows();
+  renderOutputFiles();
 }
 
 function populateForm(formState) {
@@ -327,7 +296,7 @@ function countCities(citiesText) {
   return new Set(
     citiesText
       .split(/[\n,;]+/g)
-      .map((entry) => entry.trim())
+      .map((entry) => normalizeInputToken(entry))
       .filter(Boolean),
   ).size;
 }
@@ -341,16 +310,6 @@ function formatDuration(durationMs) {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   return `${minutes}m ${remainingSeconds}s`;
-}
-
-function renderLinkCell(url) {
-  const safeUrl = sanitizeExternalUrl(url);
-  if (!safeUrl) {
-    return '';
-  }
-
-  const escapedUrl = escapeHtml(safeUrl);
-  return `<button type="button" class="secondary external-link" data-url="${escapedUrl}">${escapedUrl}</button>`;
 }
 
 function escapeHtml(value) {
@@ -382,7 +341,7 @@ function sanitizeExternalUrl(value) {
 }
 
 function normalizePotentialUrl(value) {
-  const trimmedValue = `${value}`.trim();
+  const trimmedValue = normalizeInputToken(value);
   if (!trimmedValue) {
     return '';
   }
@@ -395,12 +354,84 @@ function normalizePotentialUrl(value) {
 }
 
 function syncFormatSelection() {
+  if (state.running) {
+    for (const checkbox of elements.formatCheckboxes) {
+      checkbox.disabled = true;
+    }
+    return;
+  }
+
   const checkedCount = elements.formatCheckboxes.filter((checkbox) => checkbox.checked).length;
   const lastChecked = checkedCount === 1
     ? elements.formatCheckboxes.find((checkbox) => checkbox.checked)
     : null;
 
   for (const checkbox of elements.formatCheckboxes) {
-    checkbox.disabled = !state.running && checkedCount === 1 && checkbox === lastChecked;
+    checkbox.disabled = checkedCount === 1 && checkbox === lastChecked;
   }
+}
+
+function renderResultRows() {
+  const fragment = document.createDocumentFragment();
+
+  for (const item of state.results) {
+    const row = document.createElement('tr');
+    row.append(
+      createTextCell(item.name),
+      createTextCell(item.searchedCity),
+      createWebsiteCell(item.website),
+      createTextCell(item.generalEmail),
+      createTextCell(item.bestContactChannel),
+      createTextCell(item.bestContactValue),
+    );
+    fragment.append(row);
+  }
+
+  elements.resultsTableBody.replaceChildren(fragment);
+}
+
+function renderOutputFiles() {
+  const fragment = document.createDocumentFragment();
+
+  for (const filePath of state.outputFiles) {
+    const fileName = filePath.split(/[\\/]/).pop() ?? filePath;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'secondary output-file';
+    button.textContent = fileName;
+    button.addEventListener('click', async () => {
+      await window.kekaApp.openOutputFile(filePath);
+    });
+    fragment.append(button);
+  }
+
+  elements.outputFiles.replaceChildren(fragment);
+}
+
+function createTextCell(value) {
+  const cell = document.createElement('td');
+  cell.textContent = `${value ?? ''}`;
+  return cell;
+}
+
+function createWebsiteCell(url) {
+  const cell = document.createElement('td');
+  const safeUrl = sanitizeExternalUrl(url);
+  if (!safeUrl) {
+    return cell;
+  }
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'secondary external-link';
+  button.textContent = safeUrl;
+  button.addEventListener('click', async () => {
+    await window.kekaApp.openExternalUrl(safeUrl);
+  });
+  cell.append(button);
+  return cell;
+}
+
+function normalizeInputToken(value) {
+  return `${value ?? ''}`.replace(/\s+/g, ' ').trim();
 }

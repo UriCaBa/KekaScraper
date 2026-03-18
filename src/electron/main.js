@@ -220,7 +220,7 @@ async function isPathInsideOutputDirectory(candidatePath) {
 
   try {
     const outputDirectory = await realpath(getDesktopOutputDirectory());
-    const resolvedCandidate = await realpath(candidatePath);
+    const resolvedCandidate = await resolveCanonicalCandidatePath(candidatePath);
     const relativePath = path.relative(outputDirectory, resolvedCandidate);
 
     return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
@@ -238,5 +238,20 @@ function sendScrapeEvent(event) {
     mainWindow.webContents.send('scrape:event', event);
   } catch {
     // Ignore renderer delivery failures while a scrape continues in the main process.
+  }
+}
+
+async function resolveCanonicalCandidatePath(candidatePath) {
+  const resolvedCandidatePath = path.resolve(candidatePath);
+
+  try {
+    return await realpath(resolvedCandidatePath);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error;
+    }
+
+    const parentDirectory = await realpath(path.dirname(resolvedCandidatePath));
+    return path.join(parentDirectory, path.basename(resolvedCandidatePath));
   }
 }

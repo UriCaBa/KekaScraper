@@ -60,10 +60,13 @@ This project is intentionally local-first:
 - Validate parsed form state before flipping the desktop UI into a running or disabled state.
 - Keep frontend constraints aligned with backend behavior. If the backend requires at least one format or one valid city, the UI must enforce the same rule explicitly.
 - When a UI temporarily disables inputs during a run, restore any dynamic validation or checkbox guards when the form becomes interactive again.
+- Do not let follow-up UI helpers accidentally re-enable controls that were intentionally disabled for a running job.
 - Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
 - When the UI shows derived counts for cities or rows, use the same normalization rules as the backend so progress copy and final results stay consistent.
 - Validate critical renderer inputs again in Electron main using the same parsing rules as the shared backend, not just simple non-empty string checks.
 - Keep URL normalization consistent across display and enrichment paths. If scheme-less hostnames are accepted in the UI, the backend should normalize them too.
+- Avoid `innerHTML` for interactive controls that carry real data in attributes. Prefer DOM creation with `textContent`, closures, or `dataset` set via DOM APIs.
+- Separate path containment checks from file-existence checks so missing files return accurate errors instead of looking like boundary violations.
 
 ## Packaging Guardrails
 
