@@ -7,6 +7,8 @@ import { scrapeCity } from './lib/maps.js';
 import { enrichListings } from './lib/website-enricher.js';
 import { splitCities, timestampLabel } from './lib/utils.js';
 
+const ALLOWED_BROWSER_CHANNELS = new Set(['auto', 'msedge', 'chrome', 'chromium']);
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 
@@ -118,7 +120,7 @@ function parseArgs(argv) {
         index += 1;
         break;
       case '--browser-channel':
-        options.browserChannel = expectValue(argv, index, arg);
+        options.browserChannel = parseBrowserChannel(expectValue(argv, index, arg), arg);
         index += 1;
         break;
       case '--query-prefix':
@@ -167,6 +169,17 @@ function parseInteger(value, flagName) {
     throw new Error(`Expected an integer for ${flagName}, got "${value}"`);
   }
   return parsed;
+}
+
+function parseBrowserChannel(value, flagName) {
+  const normalizedValue = value.trim().toLowerCase();
+  if (!ALLOWED_BROWSER_CHANNELS.has(normalizedValue)) {
+    throw new Error(
+      `Expected one of ${Array.from(ALLOWED_BROWSER_CHANNELS).join(', ')} for ${flagName}, got "${value}"`,
+    );
+  }
+
+  return normalizedValue;
 }
 
 function printHelp() {

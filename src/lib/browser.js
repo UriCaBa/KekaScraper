@@ -12,6 +12,7 @@ export async function launchBrowser(options) {
 
   let browser;
   let launchError;
+  let selectedLaunchCandidate;
   const launchCandidates = getLaunchCandidates(browserChannel);
 
   for (const candidate of launchCandidates) {
@@ -21,6 +22,7 @@ export async function launchBrowser(options) {
         headless,
         slowMo,
       });
+      selectedLaunchCandidate = candidate;
       break;
     } catch (error) {
       launchError = error;
@@ -47,7 +49,11 @@ export async function launchBrowser(options) {
     return { browser, context };
   } catch (error) {
     await browser.close().catch(() => {});
-    throw error;
+    throw new Error(
+      `Failed to create a browser context for ${selectedLaunchCandidate?.label ?? 'the launched browser'}. ` +
+      `Requested browser channel: "${browserChannel}". Original error: ${error.message}`,
+      { cause: error },
+    );
   }
 }
 
@@ -56,10 +62,10 @@ function getLaunchCandidates(browserChannel) {
     return [makeChannelCandidate(browserChannel)];
   }
 
-  const platformDefaults = ['msedge', 'chrome'];
+  const autoFallbackChannels = ['msedge', 'chrome'];
 
   return [
-    ...platformDefaults.map((channel) => makeChannelCandidate(channel)),
+    ...autoFallbackChannels.map((channel) => makeChannelCandidate(channel)),
     makeBundledChromiumCandidate(),
   ];
 }
