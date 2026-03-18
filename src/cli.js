@@ -184,7 +184,7 @@ Options:
   --headful                Run the browser with UI visible
   --slow-mo 250            Slow down Playwright actions
   --max-scroll-rounds 12   Scroll attempts for result list
-  --browser-channel auto|msedge|chrome|chromium
+  --browser-channel auto|msedge|chrome|chromium  Select browser channel or bundled Chromium
   --query-prefix "hostels in"
   --enrich                 Enrich from the official website
   --no-enrich              Skip website enrichment

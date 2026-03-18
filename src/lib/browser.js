@@ -13,8 +13,9 @@ export async function launchBrowser(options) {
 
   let browser;
   let launchError;
+  const launchCandidates = getLaunchCandidates(browserChannel);
 
-  for (const candidate of getLaunchCandidates(browserChannel)) {
+  for (const candidate of launchCandidates) {
     try {
       browser = await chromium.launch({
         ...candidate.launchOptions,
@@ -29,7 +30,7 @@ export async function launchBrowser(options) {
 
   if (!browser) {
     throw new Error(
-      `Failed to launch Playwright. Tried ${formatCandidateLabels(getLaunchCandidates(browserChannel))}. ` +
+      `Failed to launch Playwright. Tried ${formatCandidateLabels(launchCandidates)}. ` +
       `Original error: ${launchError?.message ?? 'Unknown launch error.'}`,
     );
   }
@@ -55,23 +56,29 @@ function getLaunchCandidates(browserChannel) {
     return [makeChannelCandidate(browserChannel)];
   }
 
-  const platformDefaults = process.platform === 'darwin'
-    ? ['msedge', 'chrome']
-    : ['msedge', 'chrome'];
+  const platformDefaults = ['msedge', 'chrome'];
 
   return [
     ...platformDefaults.map((channel) => makeChannelCandidate(channel)),
-    {
-      label: 'bundled Chromium',
-      launchOptions: {},
-    },
+    makeBundledChromiumCandidate(),
   ];
 }
 
 function makeChannelCandidate(channel) {
+  if (channel === 'chromium') {
+    return makeBundledChromiumCandidate();
+  }
+
   return {
     label: channel,
     launchOptions: { channel },
+  };
+}
+
+function makeBundledChromiumCandidate() {
+  return {
+    label: 'bundled Chromium',
+    launchOptions: {},
   };
 }
 

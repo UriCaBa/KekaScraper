@@ -88,10 +88,10 @@ npm run scrape -- --cities "Barcelona" --headful
 - `--city "Barcelona"` Repeatable single-city flag
 - `--limit 20` Max results per city
 - `--formats json,csv` Output formats
-- `--headful` Launch Edge with UI
+- `--headful` Launch the browser with UI
 - `--slow-mo 250` Slow down actions for debugging
 - `--max-scroll-rounds 12` Max scroll rounds on results panel
-- `--browser-channel auto|msedge|chrome|chromium` Browser channel to use
+- `--browser-channel auto|msedge|chrome|chromium` Browser channel to use, or bundled Chromium
 - `--enrich` Enable website enrichment
 - `--no-enrich` Disable website enrichment
 - `--website-page-limit 8` Max same-domain pages to scan per website
