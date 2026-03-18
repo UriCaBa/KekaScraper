@@ -56,6 +56,7 @@ bootstrap().catch((error) => {
   appendLog(`Failed to load the app: ${error.message}`, 'error');
   elements.statusCopy.textContent = error.message;
   elements.statusPhase.textContent = 'Error';
+  renderStatus();
 });
 
 async function bootstrap() {
@@ -114,6 +115,7 @@ async function handleSubmit() {
   renderResults();
   setFormDisabled(true);
   appendLog(`Preparing a run for ${state.totalCities} ${state.totalCities === 1 ? 'city' : 'cities'}.`);
+  renderStatus();
 
   try {
     const result = await window.kekaApp.startScrape(payload);
@@ -312,7 +314,6 @@ function appendLog(message, tone = 'info') {
     ...state.logs,
     { message, tone },
   ].slice(-120);
-  renderStatus();
 }
 
 async function runUiAction(action, failureLabel) {

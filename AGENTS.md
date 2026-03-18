@@ -66,6 +66,7 @@ This project is intentionally local-first:
 - Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
 - Do not promote placeholder tokens such as `null`, `undefined`, or `n/a` into public URLs. Scheme-less URL normalization should require a plausible hostname.
 - Catch rejected IPC calls in renderer event handlers and surface them in visible UI state/logs instead of leaving unhandled promise rejections.
+- Keep renderer rendering explicit on hot paths. State helpers such as `appendLog()` should not hide DOM work if the caller already owns the render cadence.
 - When the UI shows derived counts for cities or rows, use the same normalization rules as the backend so progress copy and final results stay consistent.
 - If the renderer cannot import a backend helper directly, mirror the backend parsing logic in a small, clearly named helper instead of open-coding a “close enough” variant.
 - Validate critical renderer inputs again in Electron main using the same parsing rules as the shared backend, not just simple non-empty string checks.
