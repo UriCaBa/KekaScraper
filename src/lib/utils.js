@@ -210,7 +210,7 @@ function normalizePotentialUrl(value) {
     return '';
   }
 
-  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmedValue)) {
+  if (/^https?:\/\//i.test(trimmedValue)) {
     return trimmedValue;
   }
 

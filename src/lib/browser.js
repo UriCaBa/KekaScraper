@@ -94,7 +94,7 @@ function makeChannelCandidate(channel) {
   }
 
   return {
-    label: channel,
+    label: formatChannelLabel(channel),
     launchOptions: { channel },
   };
 }
@@ -108,4 +108,15 @@ function makeBundledChromiumCandidate(label = 'bundled Chromium') {
 
 function formatCandidateLabels(candidates) {
   return candidates.map((candidate) => `"${candidate.label}"`).join(', ');
+}
+
+function formatChannelLabel(channel) {
+  switch (channel) {
+    case 'msedge':
+      return 'Microsoft Edge';
+    case 'chrome':
+      return 'Google Chrome';
+    default:
+      return channel;
+  }
 }

@@ -68,6 +68,7 @@ This project is intentionally local-first:
 - Do not let follow-up UI helpers accidentally re-enable controls that were intentionally disabled for a running job.
 - Normalize persisted preferences before hydrating the UI. Treat the local preferences file as untrusted input and fall back field-by-field.
 - Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
+- When accepting scheme-less website inputs, do not treat a plain `host:port` token as an already-schemed URL. Only treat explicit `http://` or `https://` values as pre-schemed.
 - Do not promote placeholder tokens such as `null`, `undefined`, or `n/a` into public URLs. Scheme-less URL normalization should require a plausible hostname.
 - Catch rejected IPC calls in renderer event handlers and surface them in visible UI state/logs instead of leaving unhandled promise rejections.
 - Keep renderer rendering explicit on hot paths. State helpers such as `appendLog()` should not hide DOM work if the caller already owns the render cadence.
@@ -83,6 +84,7 @@ This project is intentionally local-first:
 - For local file-opening actions, distinguish clearly between "outside allowed boundary", "output directory missing", and "file missing" instead of collapsing them into one generic path error.
 - In run summaries, prioritize failure signal over "empty results" signal so partial failures with zero rows are still reported as partial rather than plain empty.
 - If a boundary helper normalizes a config value such as `outputDir`, write that normalized value back into the config object you return so callers, events, and summaries stay consistent.
+- If a browser/channel label is user-visible in the CLI or desktop UI, emit a friendly product name such as `Microsoft Edge` instead of raw internal channel ids.
 
 ## Packaging Guardrails
 
