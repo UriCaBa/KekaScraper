@@ -151,10 +151,10 @@ function buildSummary({ startedAt, finishedAt, runConfig, outputDir, cityFailure
   let outcome = 'success';
   if (cityFailures === totalCities) {
     outcome = 'failed';
-  } else if (totalResults === 0) {
-    outcome = 'empty';
   } else if (cityFailures > 0) {
     outcome = 'partial';
+  } else if (totalResults === 0) {
+    outcome = 'empty';
   }
 
   return {

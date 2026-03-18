@@ -12,7 +12,9 @@ async function main() {
     process.exit(runConfig.help ? 0 : 1);
   }
 
-  const { summary, outputFiles } = await runScrape(runConfig);
+  const { summary, outputFiles } = await runScrape(runConfig, {
+    onEvent: handleCliEvent,
+  });
 
   console.log(`\n[done] Extracted ${summary.totalResults} rows across ${summary.totalCities} cities`);
   for (const file of outputFiles) {
@@ -21,6 +23,19 @@ async function main() {
 
   if (summary.exitCode !== 0) {
     process.exit(summary.exitCode);
+  }
+}
+
+function handleCliEvent(event) {
+  switch (event.type) {
+    case 'browser-ready':
+      console.log(`[browser] ${event.selectedBrowserLabel} (requested: ${event.requestedBrowserChannel})`);
+      break;
+    case 'city-failed':
+      console.error(`[city-failed] ${event.city}: ${event.message}`);
+      break;
+    default:
+      break;
   }
 }
 

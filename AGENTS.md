@@ -55,6 +55,7 @@ This project is intentionally local-first:
 - Create required output directories before opening or writing to them instead of assuming they already exist.
 - For critical shared config such as `outputDir`, normalize once near the boundary and reuse the normalized local value across events, exports, and summaries.
 - When adding a local normalization helper around shared config, import its fallback source explicitly and return the normalized value itself, not the raw pre-trimmed input.
+- When refactoring the CLI to call a shared engine, preserve actionable console diagnostics such as per-city failures instead of relying only on the final exit code.
 - Before sending IPC events from Electron main to renderer, guard against destroyed windows and destroyed `webContents`.
 - Treat `shell.openPath()` as fallible. Check its returned error string and convert failures into explicit errors instead of assuming success.
 - Put browser, context, and page lifecycle under `try` / `finally` so Playwright resources are always cleaned up.
@@ -79,6 +80,7 @@ This project is intentionally local-first:
 - Distinguish “no run yet” from “run completed with 0 rows” in the results area so exported files remain accessible after empty runs.
 - Separate path containment checks from file-existence checks so missing files return accurate errors instead of looking like boundary violations.
 - For local file-opening actions, distinguish clearly between “outside allowed boundary”, “output directory missing”, and “file missing” instead of collapsing them into one generic path error.
+- In run summaries, prioritize failure signal over “empty results” signal so partial failures with zero rows are still reported as partial rather than plain empty.
 
 ## Packaging Guardrails
 
