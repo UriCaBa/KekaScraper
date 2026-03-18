@@ -31,6 +31,12 @@ function handleCliEvent(event) {
     case 'browser-ready':
       console.log(`[browser] ${event.selectedBrowserLabel} (requested: ${event.requestedBrowserChannel})`);
       break;
+    case 'enrichment-started':
+      console.log(`[enrich] Starting website enrichment for ${event.totalListings} listings`);
+      break;
+    case 'enrichment-item-failed':
+      console.error(`[enrich-failed] ${event.name}: ${event.message}`);
+      break;
     case 'city-failed':
       console.error(`[city-failed] ${event.city}: ${event.message}`);
       break;

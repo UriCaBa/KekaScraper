@@ -116,6 +116,8 @@ function formatChannelLabel(channel) {
       return 'Microsoft Edge';
     case 'chrome':
       return 'Google Chrome';
+    case 'chromium':
+      return 'Chromium';
     default:
       return channel;
   }

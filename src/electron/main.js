@@ -156,20 +156,21 @@ function getDefaultFormState() {
 }
 
 function normalizeStoredFormState(rawFormState = {}) {
+  const storedFormState = asPlainObject(rawFormState);
   const fallbackState = getDefaultFormState();
 
   return {
-    citiesText: normalizeStoredCitiesText(rawFormState.citiesText, fallbackState.citiesText),
-    resultLimit: normalizeStoredInteger(rawFormState.resultLimit, fallbackState.resultLimit, 'resultLimit'),
-    formats: normalizeFormats(rawFormState.formats),
-    browserChannel: normalizeStoredBrowserChannel(rawFormState.browserChannel, fallbackState.browserChannel),
-    headful: typeof rawFormState.headful === 'boolean' ? rawFormState.headful : fallbackState.headful,
+    citiesText: normalizeStoredCitiesText(storedFormState.citiesText, fallbackState.citiesText),
+    resultLimit: normalizeStoredInteger(storedFormState.resultLimit, fallbackState.resultLimit, 'resultLimit'),
+    formats: normalizeFormats(storedFormState.formats),
+    browserChannel: normalizeStoredBrowserChannel(storedFormState.browserChannel, fallbackState.browserChannel),
+    headful: typeof storedFormState.headful === 'boolean' ? storedFormState.headful : fallbackState.headful,
     enrichWebsite:
-      typeof rawFormState.enrichWebsite === 'boolean'
-        ? rawFormState.enrichWebsite
+      typeof storedFormState.enrichWebsite === 'boolean'
+        ? storedFormState.enrichWebsite
         : fallbackState.enrichWebsite,
     websitePageLimit: normalizeStoredInteger(
-      rawFormState.websitePageLimit,
+      storedFormState.websitePageLimit,
       fallbackState.websitePageLimit,
       'websitePageLimit',
     ),
@@ -177,10 +178,11 @@ function normalizeStoredFormState(rawFormState = {}) {
 }
 
 function normalizeFormState(rawFormState = {}) {
-  const citiesText = `${rawFormState.citiesText ?? ''}`.trim();
-  const formats = normalizeFormats(rawFormState.formats);
+  const formState = asPlainObject(rawFormState);
+  const citiesText = `${formState.citiesText ?? ''}`.trim();
+  const formats = normalizeFormats(formState.formats);
   const browserChannel = normalizeBrowserChannel(
-    rawFormState.browserChannel ?? defaultConfig.browserChannel,
+    formState.browserChannel ?? defaultConfig.browserChannel,
     'browser channel',
   );
 
@@ -198,13 +200,13 @@ function normalizeFormState(rawFormState = {}) {
 
   return {
     citiesText,
-    resultLimit: normalizeInteger(rawFormState.resultLimit, defaultConfig.resultLimit, 'resultLimit'),
+    resultLimit: normalizeInteger(formState.resultLimit, defaultConfig.resultLimit, 'resultLimit'),
     formats,
     browserChannel,
-    headful: normalizeBoolean(rawFormState.headful, !defaultConfig.headless),
-    enrichWebsite: normalizeBoolean(rawFormState.enrichWebsite, defaultConfig.enrichWebsite),
+    headful: normalizeBoolean(formState.headful, !defaultConfig.headless),
+    enrichWebsite: normalizeBoolean(formState.enrichWebsite, defaultConfig.enrichWebsite),
     websitePageLimit: normalizeInteger(
-      rawFormState.websitePageLimit,
+      formState.websitePageLimit,
       defaultConfig.websitePageLimit,
       'websitePageLimit',
     ),
@@ -268,7 +270,7 @@ function isSafeExternalUrl(value) {
 }
 
 async function validateOutputFilePath(candidatePath) {
-  if (!candidatePath) {
+  if (typeof candidatePath !== 'string' || candidatePath.trim().length === 0) {
     return { ok: false, message: 'The requested file path is empty.' };
   }
 
@@ -339,4 +341,12 @@ async function pathExists(targetPath) {
   } catch {
     return false;
   }
+}
+
+function asPlainObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return value;
 }

@@ -58,6 +58,7 @@ This project is intentionally local-first:
 - When adding a local normalization helper around shared config, import its fallback source explicitly and return the normalized value itself, not the raw pre-trimmed input.
 - If shared option parsing accepts both string and array inputs, apply the same whitespace normalization and de-duplication rules in both paths.
 - When refactoring the CLI to call a shared engine, preserve actionable console diagnostics such as per-city failures instead of relying only on the final exit code.
+- If a library stops writing warnings directly to stderr and emits structured events instead, update the CLI surface to log the new failure events so enrichment/debugging diagnostics are not lost.
 - Before sending IPC events from Electron main to renderer, guard against destroyed windows and destroyed `webContents`.
 - Treat `shell.openPath()` as fallible. Check its returned error string and convert failures into explicit errors instead of assuming success.
 - Put browser, context, and page lifecycle under `try` / `finally` so Playwright resources are always cleaned up.
@@ -78,7 +79,9 @@ This project is intentionally local-first:
 - When the UI shows derived counts for cities or rows, use the same normalization rules as the backend so progress copy and final results stay consistent.
 - If the renderer cannot import a backend helper directly, mirror the backend parsing logic in a small, clearly named helper instead of open-coding a "close enough" variant.
 - Validate critical renderer inputs again in Electron main using the same parsing rules as the shared backend, not just simple non-empty string checks.
+- Coerce renderer IPC payloads to a plain object before reading fields from them. Do not assume a compromised or buggy renderer will always send an object.
 - Treat renderer-provided booleans as untrusted input too. Coerce only real booleans and otherwise fall back to defaults.
+- For local path IPC actions, validate both type and content before calling `path.resolve()`. Reject non-string values with a user-facing validation error instead of letting Node throw a type error.
 - Keep URL normalization consistent across display and enrichment paths. If scheme-less hostnames are accepted in the UI, the backend should normalize them too.
 - Avoid `innerHTML` for interactive controls that carry real data in attributes. Prefer DOM creation with `textContent`, closures, or `dataset` set via DOM APIs.
 - Final desktop UI state should reconcile from the returned scrape summary, not rely exclusively on streamed IPC progress events.
@@ -89,7 +92,9 @@ This project is intentionally local-first:
 - In run summaries, prioritize failure signal over "empty results" signal so partial failures with zero rows are still reported as partial rather than plain empty.
 - If a boundary helper normalizes a config value such as `outputDir`, write that normalized value back into the config object you return so callers, events, and summaries stay consistent.
 - If a browser/channel label is user-visible in the CLI or desktop UI, emit a friendly product name such as `Microsoft Edge` instead of raw internal channel ids.
+- Keep friendly browser labels complete for every supported channel, including fallback cases such as `Chromium`, instead of formatting only the most common ones.
 - Shared engine and library layers should not write directly to stdout/stderr for routine progress. Surface progress and warnings through hooks/events so each surface decides what to render.
+- When a surface consumes shared engine events, keep the renderer/CLI handler aligned with the event payload contract and smoke-test the path after renaming payload fields.
 - If the shared engine stamps event metadata such as `timestamp`, set that metadata after spreading caller-provided fields so upstream payloads cannot overwrite it accidentally.
 - UI labels for progress counters must match the actual semantics of the underlying state. If failures are counted too, prefer wording such as `processed` over `completed`.
 - Do not send full large result sets over Electron IPC just to render a preview. Return a bounded preview slice plus summary/output paths, and let exports remain the full source of truth.
