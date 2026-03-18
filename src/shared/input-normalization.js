@@ -11,20 +11,25 @@ const INVALID_URL_HOST_TOKENS = new Set([
 ]);
 
 const PUBLIC_HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+const DEFAULT_DELIMITER_PATTERN = /[,\n;]+/;
+const CITY_DELIMITER_PATTERN = /[\n;]+/;
 
 export function normalizeInputToken(value) {
   return `${value ?? ''}`.replace(/\s+/g, ' ').trim();
 }
 
-export function splitDelimitedValues(rawValues = []) {
+export function splitDelimitedValues(rawValues = [], delimiterPattern = DEFAULT_DELIMITER_PATTERN) {
   return rawValues
-    .flatMap((value) => `${value ?? ''}`.split(/[,\n;]+/))
+    .flatMap((value) => `${value ?? ''}`.split(delimiterPattern))
     .map((value) => normalizeInputToken(value))
     .filter(Boolean);
 }
 
 export function splitCityInput(rawValues = []) {
-  return splitDelimitedValues(Array.isArray(rawValues) ? rawValues : [rawValues]);
+  return splitDelimitedValues(
+    Array.isArray(rawValues) ? rawValues : [rawValues],
+    CITY_DELIMITER_PATTERN,
+  );
 }
 
 export function countUniqueCities(rawValues = []) {

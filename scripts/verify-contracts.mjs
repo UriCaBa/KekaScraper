@@ -2,16 +2,26 @@ import assert from 'node:assert/strict';
 import { defaultConfig } from '../src/config.js';
 import { RUN_EVENT_TYPES } from '../src/lib/run-events.js';
 import { normalizeRunOptions } from '../src/lib/run-options.js';
-import { countUniqueCities, normalizePublicUrl, splitCityInput } from '../src/shared/input-normalization.js';
+import {
+  countUniqueCities,
+  normalizePublicUrl,
+  splitCityInput,
+  splitDelimitedValues,
+} from '../src/shared/input-normalization.js';
 
 assert.deepEqual(
   splitCityInput([' Barcelona, Bilbao\nDonostia ; Barcelona ']),
-  ['Barcelona', 'Bilbao', 'Donostia', 'Barcelona'],
+  ['Barcelona, Bilbao', 'Donostia', 'Barcelona'],
 );
 
 assert.equal(
   countUniqueCities('Barcelona\nBilbao\nBarcelona'),
   2,
+);
+
+assert.deepEqual(
+  splitDelimitedValues(['json,csv']),
+  ['json', 'csv'],
 );
 
 assert.equal(normalizePublicUrl('example.com'), 'https://example.com/');

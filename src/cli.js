@@ -161,10 +161,10 @@ function printHelp() {
 KekaScraper
 
 Usage:
-  npm run scrape -- --cities "Barcelona,Bilbao"
+  npm run scrape -- --cities "Barcelona;Bilbao"
 
 Options:
-  --cities "A,B,C"         Comma, semicolon, or newline separated cities
+  --cities "A;B;C"         Semicolon or newline separated cities
   --city "Barcelona"       Repeatable city flag
   --limit 20               Max result rows per city
   --formats json,csv       Output formats
