@@ -101,7 +101,7 @@ function registerIpcHandlers() {
       buildRunConfig(formState),
       {
         onEvent: (event) => {
-          mainWindow?.webContents.send('scrape:event', event);
+          sendScrapeEvent(event);
         },
       },
     );
@@ -216,4 +216,12 @@ async function isPathInsideOutputDirectory(candidatePath) {
   } catch {
     return false;
   }
+}
+
+function sendScrapeEvent(event) {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send('scrape:event', event);
 }

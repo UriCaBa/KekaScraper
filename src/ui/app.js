@@ -324,11 +324,12 @@ function buildCompletionMessage(summary) {
 }
 
 function countCities(citiesText) {
-  return citiesText
-    .split(/[\n,;]+/g)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .length;
+  return new Set(
+    citiesText
+      .split(/[\n,;]+/g)
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  ).size;
 }
 
 function formatDuration(durationMs) {
