@@ -91,7 +91,7 @@ npm run scrape -- --cities "Barcelona" --headful
 - `--browser-channel msedge` Browser channel to use
 - `--enrich` Enable website enrichment
 - `--no-enrich` Disable website enrichment
-- `--website-page-limit 4` Max same-domain pages to scan per website
+- `--website-page-limit 8` Max same-domain pages to scan per website
 
 ## Notes and limits
 
