@@ -95,8 +95,13 @@ export function normalizeFormats(value) {
 }
 
 function normalizeCities(value) {
-  const items = value === undefined || value === null
-    ? []
-    : splitCityInput(Array.isArray(value) ? value : [`${value}`]);
-  return [...new Set(items.map((item) => normalizeWhitespace(String(item))).filter(Boolean))];
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  const items = Array.isArray(value)
+    ? value.map((item) => normalizeWhitespace(String(item))).filter(Boolean)
+    : splitCityInput([`${value}`]).map((item) => normalizeWhitespace(String(item))).filter(Boolean);
+
+  return [...new Set(items)];
 }

@@ -8,6 +8,7 @@ import { savePreferences, loadPreferences } from './preferences.js';
 import { normalizeBoolean, normalizeBrowserChannel, normalizeFormats, normalizeInteger } from '../lib/run-options.js';
 import { runScrape } from '../lib/run-scrape.js';
 import { splitCities } from '../lib/utils.js';
+import { hasUrlCredentials } from '../shared/input-normalization.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(currentDir, '..', '..');
@@ -263,7 +264,8 @@ function getDesktopOutputDirectory() {
 function isSafeExternalUrl(value) {
   try {
     const parsed = new URL(value);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      && !hasUrlCredentials(parsed);
   } catch {
     return false;
   }

@@ -57,6 +57,7 @@ This project is intentionally local-first:
 - For critical shared config such as `outputDir`, normalize once near the boundary and reuse the normalized local value across events, exports, and summaries.
 - When adding a local normalization helper around shared config, import its fallback source explicitly and return the normalized value itself, not the raw pre-trimmed input.
 - If shared option parsing accepts both string and array inputs, apply the same whitespace normalization and de-duplication rules in both paths.
+- Do not blindly apply delimiter splitting to array-based option inputs. Repeated flags such as `--city` should keep each provided value atomic unless the caller explicitly used the delimited string form.
 - When refactoring the CLI to call a shared engine, preserve actionable console diagnostics such as per-city failures instead of relying only on the final exit code.
 - If a library stops writing warnings directly to stderr and emits structured events instead, update the CLI surface to log the new failure events so enrichment/debugging diagnostics are not lost.
 - When logging shared failure events in the CLI, always fall back from optional human labels to another identifier such as `website` or a generic placeholder so diagnostics stay actionable even with partial payloads.
@@ -75,6 +76,7 @@ This project is intentionally local-first:
 - Persist local preferences atomically when practical: write to a temp file in the same directory and rename it into place instead of overwriting the final JSON path directly.
 - Normalize user-facing website values before rendering them as links. Accept common scheme-less hostnames, but still restrict the final rendered URL to safe `http` / `https`.
 - When accepting scheme-less website inputs, do not treat a plain `host:port` token as an already-schemed URL. Only treat explicit `http://` or `https://` values as pre-schemed.
+- Reject URLs that contain `username` / `password` (`trusted.com@evil.com` style user-info) in shared normalization, backend fetch paths, and Electron external-link guards.
 - Do not promote placeholder tokens such as `null`, `undefined`, or `n/a` into public URLs. Scheme-less URL normalization should require a plausible hostname.
 - Catch rejected IPC calls in renderer event handlers and surface them in visible UI state/logs instead of leaving unhandled promise rejections.
 - Keep renderer rendering explicit on hot paths. State helpers such as `appendLog()` should not hide DOM work if the caller already owns the render cadence.

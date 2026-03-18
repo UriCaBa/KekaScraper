@@ -58,6 +58,7 @@ export function normalizePublicUrl(value) {
     const parsed = new URL(normalizedValue);
     if (
       (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+      || hasUrlCredentials(parsed)
       || !isLikelyPublicHostname(parsed.hostname)
     ) {
       return null;
@@ -83,4 +84,9 @@ export function isLikelyPublicHostname(value) {
   }
 
   return PUBLIC_HOSTNAME_PATTERN.test(hostname);
+}
+
+export function hasUrlCredentials(value) {
+  const parsed = value instanceof URL ? value : new URL(value);
+  return parsed.username !== '' || parsed.password !== '';
 }

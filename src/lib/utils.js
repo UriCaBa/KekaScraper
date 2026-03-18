@@ -1,6 +1,11 @@
 import fs from 'node:fs/promises';
 import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
-import { isLikelyPublicHostname, normalizePotentialUrl as normalizeSharedPotentialUrl, splitCityInput } from '../shared/input-normalization.js';
+import {
+  hasUrlCredentials,
+  isLikelyPublicHostname,
+  normalizePotentialUrl as normalizeSharedPotentialUrl,
+  splitCityInput,
+} from '../shared/input-normalization.js';
 
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -195,6 +200,7 @@ export function normalizeUrl(value) {
     const parsed = new URL(normalizedValue);
     if (
       (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+      || hasUrlCredentials(parsed)
       || !isLikelyPublicHostname(parsed.hostname)
     ) {
       return null;

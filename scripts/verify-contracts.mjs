@@ -17,14 +17,21 @@ assert.equal(
 assert.equal(normalizePublicUrl('example.com'), 'https://example.com/');
 assert.equal(normalizePublicUrl('null'), null);
 assert.equal(normalizePublicUrl('foo:8080'), null);
+assert.equal(normalizePublicUrl('https://trusted.com@evil.com'), null);
 
 const normalized = normalizeRunOptions({
-  cities: [' Barcelona ', 'Bilbao\nDonostia'],
+  cities: ' Barcelona ; Bilbao\nDonostia ',
   formats: undefined,
 }, { requireCities: true });
 
 assert.deepEqual(normalized.cities, ['Barcelona', 'Bilbao', 'Donostia']);
 assert.deepEqual(normalized.formats, defaultConfig.formats);
+
+const repeatedCityFlags = normalizeRunOptions({
+  cities: ['Paris, France', 'New York'],
+}, { requireCities: true });
+
+assert.deepEqual(repeatedCityFlags.cities, ['Paris, France', 'New York']);
 assert.equal(RUN_EVENT_TYPES.RUN_COMPLETED, 'run-completed');
 
 console.log('Shared contracts verified.');
