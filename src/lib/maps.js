@@ -1,5 +1,6 @@
-import { firstNonEmpty, parseRatingAndReviews, retry, sleep, stripFieldPrefix } from './utils.js';
+import { firstNonEmpty, parseRatingAndReviews, retry, stripFieldPrefix } from './utils.js';
 import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
+import { jitteredSleep } from './stealth.js';
 
 const LISTING_LINK_SELECTOR = 'a[href*="/maps/place/"], a[href*="/place/"]';
 const STRONG_POSITIVE_HINT_REGEX =
@@ -188,13 +189,13 @@ export async function scrapeCity(page, detailPage, options) {
             positiveSignals: listingMatch.positiveSignals,
             negativeSignals: listingMatch.negativeSignals,
           });
-          await sleep(detailPauseMs);
+          await jitteredSleep(detailPauseMs);
           continue;
         }
 
         results.push(item);
         stats.listingsAccepted += 1;
-        await sleep(detailPauseMs);
+        await jitteredSleep(detailPauseMs);
       } catch (error) {
         stats.listingFailures += 1;
         emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_FAILED, {
@@ -204,7 +205,7 @@ export async function scrapeCity(page, detailPage, options) {
           listingUrl,
           message: error?.message ?? String(error),
         });
-        await sleep(detailPauseMs);
+        await jitteredSleep(detailPauseMs);
       }
     }
   }
@@ -248,7 +249,7 @@ async function dismissConsentIfPresent(page) {
             await button.click({ timeout: 3000 });
             dismissed += 1;
             clickedThisPass = true;
-            await sleep(500);
+            await jitteredSleep(500);
             break;
           }
         } catch {
@@ -292,7 +293,7 @@ async function collectListingUrls(page, options) {
     }
 
     await scrollResultsPanel(page);
-    await sleep(1250);
+    await jitteredSleep(1250);
 
     if (seen.size === previousCount) {
       stagnantRounds += 1;
@@ -303,7 +304,7 @@ async function collectListingUrls(page, options) {
 
     if (stagnantRounds === 2) {
       await page.mouse.wheel(0, 2500);
-      await sleep(1500);
+      await jitteredSleep(1500);
     } else if (stagnantRounds >= 4) {
       break;
     }
@@ -337,6 +338,11 @@ async function readListingUrls(page) {
 }
 
 async function scrollResultsPanel(page) {
+  const viewport = page.viewportSize() ?? { width: 1440, height: 900 };
+  const x = 100 + Math.floor(Math.random() * Math.min(300, viewport.width - 200));
+  const y = 200 + Math.floor(Math.random() * Math.min(400, viewport.height - 300));
+  await page.mouse.move(x, y).catch(() => {});
+
   const feed = page.locator('[role="feed"], div[aria-label*="Results"]').first();
 
   if (await feed.count()) {

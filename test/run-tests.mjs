@@ -4,6 +4,7 @@ import { tests as mapsTests } from './maps.test.js';
 import { tests as runEventsTests } from './run-events.test.js';
 import { tests as runOptionsTests } from './run-options.test.js';
 import { tests as runScrapeTests } from './run-scrape.test.js';
+import { tests as stealthTests } from './stealth.test.js';
 import { tests as uiViewModelTests } from './ui-view-model.test.js';
 import { tests as utilsTests } from './utils.test.js';
 import { tests as websiteEnricherTests } from './website-enricher.test.js';
@@ -15,6 +16,7 @@ const suites = [
   { name: 'run-events', tests: runEventsTests },
   { name: 'run-options', tests: runOptionsTests },
   { name: 'run-scrape', tests: runScrapeTests },
+  { name: 'stealth', tests: stealthTests },
   { name: 'ui-view-model', tests: uiViewModelTests },
   { name: 'utils', tests: utilsTests },
   { name: 'website-enricher', tests: websiteEnricherTests },

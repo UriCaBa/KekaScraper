@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { CHROME_USER_AGENTS, VIEWPORT_POOL, STEALTH_INIT_SCRIPT, getStealthLaunchArgs, pickRandom } from './stealth.js';
 
 export async function launchBrowser(options) {
   const {
@@ -29,6 +30,7 @@ export async function launchBrowser(options) {
         ...candidate.launchOptions,
         headless,
         slowMo,
+        args: [...(candidate.launchOptions.args ?? []), ...getStealthLaunchArgs()],
       });
       selectedLaunchCandidate = candidate;
       break;
@@ -46,11 +48,16 @@ export async function launchBrowser(options) {
   }
 
   try {
+    const viewport = pickRandom(VIEWPORT_POOL) ?? VIEWPORT_POOL[0];
+    const userAgent = pickRandom(CHROME_USER_AGENTS) ?? CHROME_USER_AGENTS[0];
     const context = await browser.newContext({
       locale,
-      viewport: { width: 1440, height: 1100 },
+      viewport: { width: viewport.width, height: viewport.height },
+      deviceScaleFactor: viewport.deviceScaleFactor,
+      userAgent,
     });
 
+    await context.addInitScript(STEALTH_INIT_SCRIPT);
     context.setDefaultNavigationTimeout(navigationTimeoutMs);
     context.setDefaultTimeout(actionTimeoutMs);
 
@@ -60,6 +67,7 @@ export async function launchBrowser(options) {
       launchSummary: {
         requestedBrowserChannel: browserChannel,
         selectedCandidateLabel: selectedLaunchCandidate?.label ?? 'unknown browser',
+        viewport: `${viewport.width}x${viewport.height}`,
       },
     };
   } catch (error) {
