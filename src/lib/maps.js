@@ -741,7 +741,13 @@ function scoreSignal(value, regex, points, label, collector) {
 async function waitForListingSignals(page) {
   await Promise.race([
     page
-      .locator('button[data-item-id="address"], button[aria-label^="Address"], button[aria-label^="Dire"]')
+      .locator(
+        'button[data-item-id="address"], ' +
+          'button[aria-label^="Address"], ' +
+          'button[aria-label^="Dirección"], ' +
+          'button[aria-label^="Direccion"], ' +
+          'button[aria-label^="Adresse"]',
+      )
       .first()
       .waitFor({ state: 'visible', timeout: 5000 }),
     page

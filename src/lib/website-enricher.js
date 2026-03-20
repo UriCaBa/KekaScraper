@@ -412,11 +412,21 @@ export function extractEmails(value) {
       if (/\.(png|jpg|jpeg|svg|webp|gif|bmp|ico|css|js|woff|woff2|ttf|eot|map)$/i.test(email)) {
         return false;
       }
-      const localPart = email.split('@')[0];
+      const [localPart, domain] = email.split('@');
+      if (!domain) {
+        return false;
+      }
       if (/\.\./.test(localPart)) {
         return false;
       }
       if (/^[._%+-]|[._%+-]$/.test(localPart)) {
+        return false;
+      }
+      if (/\.\./.test(domain) || /^\./.test(domain) || /\.$/.test(domain)) {
+        return false;
+      }
+      const labels = domain.split('.');
+      if (labels.some((label) => !label || /^-/.test(label) || /-$/.test(label))) {
         return false;
       }
       return true;

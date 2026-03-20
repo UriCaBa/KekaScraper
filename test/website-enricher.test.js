@@ -20,6 +20,9 @@ export const tests = [
       assert.deepEqual(extractEmails('.leading@example.com'), []);
       assert.deepEqual(extractEmails('trailing.@example.com'), []);
       assert.deepEqual(extractEmails('valid@hostel.com trail.@bad.com'), ['valid@hostel.com']);
+      assert.deepEqual(extractEmails('user@domain..com'), []);
+      assert.deepEqual(extractEmails('user@.domain.com'), []);
+      assert.deepEqual(extractEmails('user@-host.com'), []);
     },
   },
 ];
