@@ -33,7 +33,7 @@ export function getRootDir() {
 function buildDefaultUserAgent() {
   const platformToken = getPlatformToken();
 
-  return `Mozilla/5.0 (${platformToken}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 KekaScraper/1.0`;
+  return `Mozilla/5.0 (${platformToken}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36`;
 }
 
 function getPlatformToken() {
