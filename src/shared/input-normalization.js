@@ -1,14 +1,4 @@
-const INVALID_URL_HOST_TOKENS = new Set([
-  '-',
-  '--',
-  'n/a',
-  'na',
-  'nil',
-  'none',
-  'null',
-  'undefined',
-  'unknown',
-]);
+const INVALID_URL_HOST_TOKENS = new Set(['-', '--', 'n/a', 'na', 'nil', 'none', 'null', 'undefined', 'unknown']);
 
 const PUBLIC_HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 const DEFAULT_DELIMITER_PATTERN = /[,\n;]+/;
@@ -26,10 +16,7 @@ export function splitDelimitedValues(rawValues = [], delimiterPattern = DEFAULT_
 }
 
 export function splitCityInput(rawValues = []) {
-  return splitDelimitedValues(
-    Array.isArray(rawValues) ? rawValues : [rawValues],
-    CITY_DELIMITER_PATTERN,
-  );
+  return splitDelimitedValues(Array.isArray(rawValues) ? rawValues : [rawValues], CITY_DELIMITER_PATTERN);
 }
 
 export function countUniqueCities(rawValues = []) {
@@ -62,9 +49,9 @@ export function normalizePublicUrl(value) {
   try {
     const parsed = new URL(normalizedValue);
     if (
-      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
-      || hasUrlCredentials(parsed)
-      || !isLikelyPublicHostname(parsed.hostname)
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+      hasUrlCredentials(parsed) ||
+      !isLikelyPublicHostname(parsed.hostname)
     ) {
       return null;
     }
@@ -81,9 +68,7 @@ export function isLikelyPublicHostname(value) {
     return false;
   }
 
-  const hostname = normalizedValue
-    .split(/[/?#]/, 1)[0]
-    .replace(/:\d{1,5}$/, '');
+  const hostname = normalizedValue.split(/[/?#]/, 1)[0].replace(/:\d{1,5}$/, '');
   if (!hostname || hostname.includes('@') || INVALID_URL_HOST_TOKENS.has(hostname)) {
     return false;
   }

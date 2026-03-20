@@ -9,6 +9,13 @@
     "dev": "electron src/electron/main.js",
     "scrape": "node src/cli.js",
     "smoke": "node src/cli.js --cities \"Barcelona\" --limit 3 --formats json,csv",
+    "smoke:renderer": "node scripts/smoke-renderer.mjs",
+    "smoke:electron": "node scripts/smoke-electron.mjs",
+    "test": "node test/run-tests.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "verify:contracts": "node scripts/verify-contracts.mjs",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
@@ -25,8 +32,13 @@
     "playwright": "^1.58.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "electron": "^41.0.3",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1"
   },
   "build": {
     "appId": "com.uricaba.kekascraper",

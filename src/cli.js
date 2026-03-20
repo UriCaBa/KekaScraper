@@ -38,10 +38,26 @@ function handleCliEvent(event) {
       console.log(`[search] ${event.searchQuery}`);
       break;
     case RUN_EVENT_TYPES.CITY_SEARCH_RESULTS:
-      console.log(`[results] Found ${event.candidateCount} candidate URLs`);
+      if (typeof event.aggregatedCandidateCount === 'number') {
+        console.log(
+          `[results] Found ${event.candidateCount} candidate URLs (${event.aggregatedCandidateCount} unique total so far)`,
+        );
+      } else {
+        console.log(`[results] Found ${event.candidateCount} candidate URLs`);
+      }
+      break;
+    case RUN_EVENT_TYPES.LISTING_SKIPPED:
+      console.log(`[skip] ${event.name ?? event.listingUrl}: ${formatListingSkipReason(event)}`);
       break;
     case RUN_EVENT_TYPES.RETRYING:
       console.error(`[retry] ${event.label}: ${event.message}`);
+      break;
+    case RUN_EVENT_TYPES.CITY_COMPLETED:
+      if (event.cityStats) {
+        console.log(
+          `[city-summary] processed=${event.cityStats.listingsProcessed} accepted=${event.cityStats.listingsAccepted} skipped=${event.cityStats.listingsSkipped} failed=${event.cityStats.listingFailures} uniqueCandidates=${event.cityStats.uniqueCandidates} queries=${event.cityStats.queriesTried}`,
+        );
+      }
       break;
     case RUN_EVENT_TYPES.LISTING_FAILED:
       console.error(`[detail-failed] ${event.listingUrl}: ${event.message}`);
@@ -155,6 +171,17 @@ function parseInteger(value, flagName, options = {}) {
 
 function describeEnrichmentTarget(event) {
   return event.name ?? event.website ?? 'listing without website';
+}
+
+function formatListingSkipReason(event) {
+  const scoreText = typeof event.score === 'number' ? `score=${event.score}` : null;
+  const signals = [
+    ...(Array.isArray(event.positiveSignals) ? event.positiveSignals : []),
+    ...(Array.isArray(event.negativeSignals) ? event.negativeSignals : []),
+  ];
+  return [event.reason ?? 'skipped', scoreText, signals.length ? `signals=${signals.join(',')}` : null]
+    .filter(Boolean)
+    .join(' | ');
 }
 
 function printHelp() {

@@ -45,7 +45,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
       });
 
       try {
-        const cityResults = await scrapeCity(page, detailPage, {
+        const cityRun = await scrapeCity(page, detailPage, {
           city,
           queryPrefix: normalizedRunConfig.queryPrefix,
           resultLimit: normalizedRunConfig.resultLimit,
@@ -56,13 +56,22 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
           onEvent: emit,
         });
 
-        allResults.push(...cityResults);
-        emitRunEvent(emit, RUN_EVENT_TYPES.CITY_COMPLETED, {
+        const cityCompleted = buildCityCompletedPayload({
           city,
           index: index + 1,
           totalCities: normalizedRunConfig.cities.length,
-          cityResultCount: cityResults.length,
+          cityRun,
           totalResultCount: allResults.length,
+        });
+        const cityResults = cityCompleted.cityResults;
+        allResults.push(...cityResults);
+        emitRunEvent(emit, RUN_EVENT_TYPES.CITY_COMPLETED, {
+          city: cityCompleted.city,
+          index: cityCompleted.index,
+          totalCities: cityCompleted.totalCities,
+          cityResultCount: cityCompleted.cityResultCount,
+          totalResultCount: allResults.length,
+          cityStats: cityCompleted.cityStats,
         });
       } catch (error) {
         cityFailures += 1;
@@ -75,10 +84,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
       }
     }
   } finally {
-    await Promise.allSettled([
-      context.close(),
-      browser.close(),
-    ]);
+    await Promise.allSettled([context.close(), browser.close()]);
   }
 
   let finalResults = allResults;
@@ -123,12 +129,19 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
   };
 }
 
-function buildSummary({ startedAt, finishedAt, runConfig, outputDir, cityFailures, totalResults, outputFiles, launchSummary }) {
+function buildSummary({
+  startedAt,
+  finishedAt,
+  runConfig,
+  outputDir,
+  cityFailures,
+  totalResults,
+  outputFiles,
+  launchSummary,
+}) {
   const totalCities = runConfig.cities.length;
   const durationMs = finishedAt.getTime() - startedAt.getTime();
-  const outputDirectory = outputFiles[0]
-    ? path.dirname(outputFiles[0])
-    : path.resolve(outputDir);
+  const outputDirectory = outputFiles[0] ? path.dirname(outputFiles[0]) : path.resolve(outputDir);
 
   let outcome = 'success';
   if (cityFailures === totalCities) {
@@ -157,7 +170,34 @@ function buildSummary({ startedAt, finishedAt, runConfig, outputDir, cityFailure
 }
 
 function normalizeOutputDir(value) {
-  return typeof value === 'string' && value.trim()
-    ? value.trim()
-    : defaultConfig.outputDir;
+  return typeof value === 'string' && value.trim() ? value.trim() : defaultConfig.outputDir;
+}
+
+export function buildCityCompletedPayload({ city, index, totalCities, cityRun, totalResultCount = 0 }) {
+  const cityResults = Array.isArray(cityRun?.results) ? cityRun.results : [];
+
+  return {
+    city,
+    index,
+    totalCities,
+    cityResults,
+    cityResultCount: cityResults.length,
+    totalResultCount,
+    cityStats: normalizeCityStats(cityRun?.stats, cityResults.length),
+  };
+}
+
+function normalizeCityStats(stats, cityResultCount) {
+  return {
+    queriesTried: normalizeCount(stats?.queriesTried),
+    uniqueCandidates: normalizeCount(stats?.uniqueCandidates),
+    listingsProcessed: normalizeCount(stats?.listingsProcessed, cityResultCount),
+    listingsAccepted: normalizeCount(stats?.listingsAccepted, cityResultCount),
+    listingsSkipped: normalizeCount(stats?.listingsSkipped),
+    listingFailures: normalizeCount(stats?.listingFailures),
+  };
+}
+
+function normalizeCount(value, fallback = 0) {
+  return Number.isInteger(value) && value >= 0 ? value : fallback;
 }

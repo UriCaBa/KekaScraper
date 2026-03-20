@@ -40,7 +40,7 @@ export async function launchBrowser(options) {
   if (!browser) {
     throw new Error(
       `Failed to launch Playwright. Tried ${formatCandidateLabels(launchCandidates)}. ` +
-      `Original error: ${launchError?.message ?? 'Unknown launch error.'}`,
+        `Original error: ${launchError?.message ?? 'Unknown launch error.'}`,
       { cause: launchError },
     );
   }
@@ -66,7 +66,7 @@ export async function launchBrowser(options) {
     await browser.close().catch(() => {});
     throw new Error(
       `Failed to create a browser context for ${selectedLaunchCandidate?.label ?? 'the launched browser'}. ` +
-      `Requested browser channel: "${browserChannel}". Original error: ${error.message}`,
+        `Requested browser channel: "${browserChannel}". Original error: ${error.message}`,
       { cause: error },
     );
   }

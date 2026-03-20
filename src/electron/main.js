@@ -6,6 +6,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { defaultConfig } from '../config.js';
 import { savePreferences, loadPreferences } from './preferences.js';
 import { normalizeBoolean, normalizeBrowserChannel, normalizeFormats, normalizeInteger } from '../lib/run-options.js';
+import { RUN_EVENT_TYPES } from '../lib/run-events.js';
 import { runScrape } from '../lib/run-scrape.js';
 import { splitCities } from '../lib/utils.js';
 import { hasUrlCredentials } from '../shared/input-normalization.js';
@@ -13,6 +14,7 @@ import { hasUrlCredentials } from '../shared/input-normalization.js';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(currentDir, '..', '..');
 const uiEntryPath = path.join(rootDir, 'src', 'ui', 'index.html');
+const isSmokeMode = process.env.KEKA_SMOKE_MODE === '1';
 
 let mainWindow;
 let activeRunPromise = null;
@@ -44,7 +46,7 @@ function createMainWindow() {
     backgroundColor: '#f4efe5',
     title: 'KekaScraper',
     webPreferences: {
-      preload: path.join(currentDir, 'preload.js'),
+      preload: path.join(currentDir, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -102,14 +104,7 @@ function registerIpcHandlers() {
     const formState = normalizeFormState(rawFormState);
     await savePreferences(app.getPath('userData'), formState);
 
-    activeRunPromise = runScrape(
-      buildRunConfig(formState),
-      {
-        onEvent: (event) => {
-          sendScrapeEvent(event);
-        },
-      },
-    );
+    activeRunPromise = startDesktopScrape(buildRunConfig(formState));
 
     try {
       const result = await activeRunPromise;
@@ -167,9 +162,7 @@ function normalizeStoredFormState(rawFormState = {}) {
     browserChannel: normalizeStoredBrowserChannel(storedFormState.browserChannel, fallbackState.browserChannel),
     headful: typeof storedFormState.headful === 'boolean' ? storedFormState.headful : fallbackState.headful,
     enrichWebsite:
-      typeof storedFormState.enrichWebsite === 'boolean'
-        ? storedFormState.enrichWebsite
-        : fallbackState.enrichWebsite,
+      typeof storedFormState.enrichWebsite === 'boolean' ? storedFormState.enrichWebsite : fallbackState.enrichWebsite,
     websitePageLimit: normalizeStoredInteger(
       storedFormState.websitePageLimit,
       fallbackState.websitePageLimit,
@@ -206,11 +199,7 @@ function normalizeFormState(rawFormState = {}) {
     browserChannel,
     headful: normalizeBoolean(formState.headful, !defaultConfig.headless),
     enrichWebsite: normalizeBoolean(formState.enrichWebsite, defaultConfig.enrichWebsite),
-    websitePageLimit: normalizeInteger(
-      formState.websitePageLimit,
-      defaultConfig.websitePageLimit,
-      'websitePageLimit',
-    ),
+    websitePageLimit: normalizeInteger(formState.websitePageLimit, defaultConfig.websitePageLimit, 'websitePageLimit'),
   };
 }
 
@@ -251,10 +240,22 @@ function buildRunConfig(formState) {
     browserChannel: formState.browserChannel,
     headless: !formState.headful,
     enrichWebsite: formState.enrichWebsite,
-    websitePageLimit: formState.websitePageLimit,
+    websitePageLimit: resolveDesktopWebsitePageLimit(formState),
     outputDir: getDesktopOutputDirectory(),
     allowBundledChromium: !app.isPackaged,
   };
+}
+
+function startDesktopScrape(runConfig) {
+  if (isSmokeMode) {
+    return runSmokeScrape(runConfig);
+  }
+
+  return runScrape(runConfig, {
+    onEvent: (event) => {
+      sendScrapeEvent(event);
+    },
+  });
 }
 
 function getDesktopOutputDirectory() {
@@ -264,8 +265,7 @@ function getDesktopOutputDirectory() {
 function isSafeExternalUrl(value) {
   try {
     const parsed = new URL(value);
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-      && !hasUrlCredentials(parsed);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !hasUrlCredentials(parsed);
   } catch {
     return false;
   }
@@ -277,7 +277,7 @@ async function validateOutputFilePath(candidatePath) {
   }
 
   const outputDirectoryPath = getDesktopOutputDirectory();
-  if (!await pathExists(outputDirectoryPath)) {
+  if (!(await pathExists(outputDirectoryPath))) {
     return { ok: false, message: 'The output folder does not exist yet.' };
   }
 
@@ -287,15 +287,15 @@ async function validateOutputFilePath(candidatePath) {
     const relativePath = path.relative(outputDirectory, resolvedCandidate);
 
     if (
-      relativePath === ''
-      || relativePath === '..'
-      || relativePath.startsWith(`..${path.sep}`)
-      || path.isAbsolute(relativePath)
+      relativePath === '' ||
+      relativePath === '..' ||
+      relativePath.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relativePath)
     ) {
       return { ok: false, message: 'The requested file is outside the allowed output directory.' };
     }
 
-    if (!await pathExists(resolvedCandidate)) {
+    if (!(await pathExists(resolvedCandidate))) {
       return { ok: false, message: 'The requested output file no longer exists.' };
     }
 
@@ -351,4 +351,89 @@ function asPlainObject(value) {
   }
 
   return value;
+}
+
+function resolveDesktopWebsitePageLimit(formState) {
+  const automaticLimit = normalizeInteger(formState.resultLimit, defaultConfig.resultLimit, 'resultLimit');
+
+  return automaticLimit;
+}
+
+async function runSmokeScrape(runConfig) {
+  const startedAt = new Date();
+  const cities = splitCities([runConfig.cities]);
+  const outputDirectory = runConfig.outputDir;
+  const outputFiles = runConfig.formats.map((format) => path.join(outputDirectory, `hostels-smoke.${format}`));
+  const results = cities.slice(0, Math.max(1, Math.min(2, runConfig.resultLimit))).map((city, index) => ({
+    name: `Smoke Hostel ${index + 1}`,
+    searchedCity: city,
+    website: `https://example-${index + 1}.test`,
+    generalEmail: `hello${index + 1}@example-${index + 1}.test`,
+    bestContactChannel: 'general-email',
+    bestContactValue: `hello${index + 1}@example-${index + 1}.test`,
+  }));
+
+  sendScrapeEvent({
+    type: RUN_EVENT_TYPES.RUN_STARTED,
+    startedAt: startedAt.toISOString(),
+    cities,
+    outputDirectory,
+  });
+  sendScrapeEvent({
+    type: RUN_EVENT_TYPES.BROWSER_READY,
+    requestedBrowserChannel: runConfig.browserChannel,
+    selectedBrowserLabel: 'Smoke Browser',
+  });
+
+  for (const [index, city] of cities.entries()) {
+    sendScrapeEvent({
+      type: RUN_EVENT_TYPES.CITY_STARTED,
+      city,
+      index: index + 1,
+      totalCities: cities.length,
+    });
+    sendScrapeEvent({
+      type: RUN_EVENT_TYPES.CITY_COMPLETED,
+      city,
+      index: index + 1,
+      totalCities: cities.length,
+      cityResultCount: results.filter((item) => item.searchedCity === city).length,
+      totalResultCount: results.length,
+    });
+  }
+
+  if (runConfig.enrichWebsite) {
+    sendScrapeEvent({
+      type: RUN_EVENT_TYPES.ENRICHMENT_STARTED,
+      totalListings: results.length,
+    });
+  }
+
+  const finishedAt = new Date(startedAt.getTime() + 1200);
+  const summary = {
+    startedAt: startedAt.toISOString(),
+    finishedAt: finishedAt.toISOString(),
+    durationMs: finishedAt.getTime() - startedAt.getTime(),
+    totalCities: cities.length,
+    cityFailures: 0,
+    totalResults: results.length,
+    outcome: results.length > 0 ? 'success' : 'empty',
+    exitCode: 0,
+    outputFiles,
+    outputDirectory,
+    selectedBrowserLabel: 'Smoke Browser',
+    requestedBrowserChannel: runConfig.browserChannel,
+    enrichWebsite: runConfig.enrichWebsite,
+  };
+
+  sendScrapeEvent({
+    type: RUN_EVENT_TYPES.RUN_COMPLETED,
+    summary,
+  });
+
+  return {
+    summary,
+    results,
+    outputFiles,
+  };
 }

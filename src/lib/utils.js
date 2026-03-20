@@ -12,13 +12,7 @@ export function sleep(ms) {
 }
 
 export async function retry(task, options = {}) {
-  const {
-    retries = 2,
-    delayMs = 1000,
-    label = 'operation',
-    onEvent,
-    eventContext = {},
-  } = options;
+  const { retries = 2, delayMs = 1000, label = 'operation', onEvent, eventContext = {} } = options;
 
   let lastError;
 
@@ -48,6 +42,24 @@ export async function retry(task, options = {}) {
 
 export async function ensureDir(dirPath) {
   await fs.mkdir(dirPath, { recursive: true });
+}
+
+export async function mapWithConcurrency(items, concurrency, mapper) {
+  const targetConcurrency = Math.max(1, Number.parseInt(concurrency, 10) || 1);
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(targetConcurrency, items.length || 1) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }
 
 export function normalizeWhitespace(value) {
@@ -126,9 +138,9 @@ export function parseRatingAndReviews(rawValue) {
 
   let reviewCount = null;
   const reviewMatch =
-    normalized.match(/(\d[\d.,\s]*)\s+reviews?/i)
-    ?? normalized.match(/(\d[\d.,\s]*)\s+rese(?:ñas|nas)?/i)
-    ?? normalized.match(/\((\d[\d.,\s]*)\)/);
+    normalized.match(/(\d[\d.,\s]*)\s+reviews?/i) ??
+    normalized.match(/(\d[\d.,\s]*)\s+rese(?:ñas|nas)?/i) ??
+    normalized.match(/\((\d[\d.,\s]*)\)/);
 
   if (reviewMatch) {
     reviewCount = parseNumber(reviewMatch[1]);
@@ -156,10 +168,7 @@ function escapeCsvValue(value) {
     return '';
   }
 
-  const stringValue =
-    typeof value === 'object'
-      ? JSON.stringify(value)
-      : String(value);
+  const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
   if (!/[",\n]/.test(stringValue)) {
     return stringValue;
   }
@@ -199,9 +208,9 @@ export function normalizeUrl(value) {
 
     const parsed = new URL(normalizedValue);
     if (
-      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
-      || hasUrlCredentials(parsed)
-      || !isLikelyPublicHostname(parsed.hostname)
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+      hasUrlCredentials(parsed) ||
+      !isLikelyPublicHostname(parsed.hostname)
     ) {
       return null;
     }
