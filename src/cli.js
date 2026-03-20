@@ -186,7 +186,7 @@ function formatListingSkipReason(event) {
 
 function printHelp() {
   console.log(`
-KekaScraper
+KekaScraper by Orical Labs
 
 Usage:
   npm run scrape -- --cities "Barcelona;Bilbao"

@@ -44,8 +44,8 @@
     "prettier": "^3.8.1"
   },
   "build": {
-    "appId": "com.uricaba.kekascraper",
-    "productName": "KekaScraper",
+    "appId": "com.oricallabs.kekascraper",
+    "productName": "KekaScraper by Orical Labs",
     "asar": false,
     "extraMetadata": {
       "main": "src/electron/main.js"

@@ -43,8 +43,8 @@ function createMainWindow() {
     height: 900,
     minWidth: 980,
     minHeight: 720,
-    backgroundColor: '#f4efe5',
-    title: 'KekaScraper',
+    backgroundColor: '#09090b',
+    title: 'KekaScraper by Orical Labs',
     webPreferences: {
       preload: path.join(currentDir, 'preload.cjs'),
       contextIsolation: true,

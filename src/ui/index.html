@@ -7,14 +7,14 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
     />
-    <title>KekaScraper</title>
+    <title>KekaScraper by Orical Labs</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Local desktop app</p>
+          <p class="eyebrow">Orical Labs</p>
           <h1>KekaScraper</h1>
           <p class="hero-copy">
             Search Google Maps for hostel leads, enrich public contact details, and export results without touching a
@@ -69,18 +69,18 @@
               <small id="browser-channel-help">Auto tries Edge, then Chrome, then bundled Chromium.</small>
             </label>
 
-            <fieldset class="field checkbox-group">
-              <legend>Output formats</legend>
+            <div class="field checkbox-group">
+              <span>Output formats</span>
               <label><input type="checkbox" name="formats" value="json" /> JSON</label>
               <label><input type="checkbox" name="formats" value="csv" /> CSV</label>
-            </fieldset>
+            </div>
 
             <label class="field checkbox-line">
               <input id="headful" name="headful" type="checkbox" />
               <span>Show the browser while scraping</span>
             </label>
 
-            <label class="field checkbox-line">
+            <label class="field field-wide checkbox-line">
               <input id="enrich-website" name="enrichWebsite" type="checkbox" />
               <span>Enrich results from each hostel website automatically</span>
             </label>
@@ -88,7 +88,7 @@
             <div class="form-actions field-wide">
               <button id="run-button" type="submit">Start scrape</button>
               <p class="helper-copy">
-                Results stay on this machine. No external KekaScraper API or cloud backend is involved.
+                Results stay on this machine. No external API or cloud backend is involved.
               </p>
             </div>
           </form>
