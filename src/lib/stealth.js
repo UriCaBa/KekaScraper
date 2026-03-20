@@ -2,23 +2,23 @@ import { sleep } from './utils.js';
 
 // Recent Chrome UA strings across common platforms.
 // Keep this list updated when Chrome major versions change.
-export const CHROME_USER_AGENTS = [
+export const CHROME_USER_AGENTS = Object.freeze([
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
-];
+]);
 
 // Common desktop viewport sizes with matching device scale factors.
 // 1536x864 at 1.25 is the most common Windows laptop config (125% DPI).
-export const VIEWPORT_POOL = [
-  { width: 1920, height: 1080, deviceScaleFactor: 1 },
-  { width: 1366, height: 768, deviceScaleFactor: 1 },
-  { width: 1536, height: 864, deviceScaleFactor: 1.25 },
-  { width: 1440, height: 900, deviceScaleFactor: 1 },
-  { width: 1280, height: 720, deviceScaleFactor: 1 },
-];
+export const VIEWPORT_POOL = Object.freeze([
+  Object.freeze({ width: 1920, height: 1080, deviceScaleFactor: 1 }),
+  Object.freeze({ width: 1366, height: 768, deviceScaleFactor: 1 }),
+  Object.freeze({ width: 1536, height: 864, deviceScaleFactor: 1.25 }),
+  Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 }),
+  Object.freeze({ width: 1280, height: 720, deviceScaleFactor: 1 }),
+]);
 
 export function pickRandom(array, randomFn = Math.random) {
   if (!Array.isArray(array) || array.length === 0) {
@@ -45,9 +45,16 @@ export function getStealthLaunchArgs() {
 
 // Injected into every page via context.addInitScript() to mask automation signals.
 export const STEALTH_INIT_SCRIPT = `
-  Object.defineProperty(navigator, 'webdriver', {
-    get: () => false,
-  });
+  // In real Chrome, navigator.webdriver is absent — not false.
+  // Returning false is itself a detectable fingerprint.
+  try {
+    delete Object.getPrototypeOf(navigator).webdriver;
+  } catch (_) {
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => undefined,
+      configurable: true,
+    });
+  }
 
   Object.defineProperty(navigator, 'plugins', {
     get: () => [

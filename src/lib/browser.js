@@ -48,12 +48,13 @@ export async function launchBrowser(options) {
   }
 
   try {
-    const viewport = pickRandom(VIEWPORT_POOL);
+    const viewport = pickRandom(VIEWPORT_POOL) ?? VIEWPORT_POOL[0];
+    const userAgent = pickRandom(CHROME_USER_AGENTS) ?? CHROME_USER_AGENTS[0];
     const context = await browser.newContext({
       locale,
       viewport: { width: viewport.width, height: viewport.height },
       deviceScaleFactor: viewport.deviceScaleFactor,
-      userAgent: pickRandom(CHROME_USER_AGENTS),
+      userAgent,
     });
 
     await context.addInitScript(STEALTH_INIT_SCRIPT);
