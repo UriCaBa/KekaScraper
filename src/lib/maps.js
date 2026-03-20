@@ -233,20 +233,36 @@ async function waitForResultsOrDetails(page) {
 
 async function dismissConsentIfPresent(page) {
   const patterns = [/accept all/i, /i agree/i, /aceptar todo/i, /rechazar todo/i, /accept/i];
+  let dismissed = 0;
+  const maxDismissals = 3;
 
-  for (const frame of page.frames()) {
-    for (const pattern of patterns) {
-      const button = frame.getByRole('button', { name: pattern }).first();
+  while (dismissed < maxDismissals) {
+    let clickedThisPass = false;
 
-      try {
-        if (await button.isVisible({ timeout: 1500 })) {
-          await button.click({ timeout: 3000 });
-          await sleep(1000);
-          return;
+    for (const frame of page.frames()) {
+      for (const pattern of patterns) {
+        const button = frame.getByRole('button', { name: pattern }).first();
+
+        try {
+          if (await button.isVisible({ timeout: 1500 })) {
+            await button.click({ timeout: 3000 });
+            dismissed += 1;
+            clickedThisPass = true;
+            await sleep(500);
+            break;
+          }
+        } catch {
+          // Ignore absent consent dialogs.
         }
-      } catch {
-        // Ignore absent consent dialogs.
       }
+
+      if (clickedThisPass) {
+        break;
+      }
+    }
+
+    if (!clickedThisPass) {
+      break;
     }
   }
 }
@@ -285,7 +301,10 @@ async function collectListingUrls(page, options) {
       previousCount = seen.size;
     }
 
-    if (stagnantRounds >= 3) {
+    if (stagnantRounds === 2) {
+      await page.mouse.wheel(0, 2500);
+      await sleep(1500);
+    } else if (stagnantRounds >= 4) {
       break;
     }
   }
@@ -294,7 +313,7 @@ async function collectListingUrls(page, options) {
 }
 
 async function readListingUrls(page) {
-  const feed = page.locator('[role="feed"]').first();
+  const feed = page.locator('[role="feed"], div[aria-label*="Results"]').first();
 
   if (await feed.count()) {
     return feed
@@ -318,7 +337,7 @@ async function readListingUrls(page) {
 }
 
 async function scrollResultsPanel(page) {
-  const feed = page.locator('[role="feed"]').first();
+  const feed = page.locator('[role="feed"], div[aria-label*="Results"]').first();
 
   if (await feed.count()) {
     await feed
@@ -721,10 +740,27 @@ function scoreSignal(value, regex, points, label, collector) {
 
 async function waitForListingSignals(page) {
   await Promise.race([
-    page.locator('button[data-item-id="address"]').first().waitFor({ state: 'visible', timeout: 2500 }),
-    page.locator('a[data-item-id="authority"]').first().waitFor({ state: 'visible', timeout: 2500 }),
-    page.locator('button[data-item-id^="phone"]').first().waitFor({ state: 'visible', timeout: 2500 }),
-    page.locator('button[jsaction*="pane.rating.category"]').first().waitFor({ state: 'visible', timeout: 2500 }),
-    sleep(1000),
+    page
+      .locator(
+        'button[data-item-id="address"], ' +
+          'button[aria-label^="Address"], ' +
+          'button[aria-label^="Dirección"], ' +
+          'button[aria-label^="Direccion"], ' +
+          'button[aria-label^="Adresse"]',
+      )
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 }),
+    page
+      .locator('a[data-item-id="authority"], a[aria-label^="Website"], a[aria-label^="Sitio web"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 }),
+    page
+      .locator('button[data-item-id^="phone"], button[aria-label^="Phone"], button[aria-label^="Tel"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 }),
+    page
+      .locator('button[jsaction*="pane.rating.category"], button[aria-label*="Category"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 }),
   ]).catch(() => {});
 }

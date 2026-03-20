@@ -129,6 +129,13 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
   };
 }
 
+export function determineOutcome(cityFailures, totalCities, totalResults) {
+  if (cityFailures === totalCities) return 'failed';
+  if (totalResults === 0) return 'empty';
+  if (cityFailures > 0) return 'partial';
+  return 'success';
+}
+
 function buildSummary({
   startedAt,
   finishedAt,
@@ -143,14 +150,7 @@ function buildSummary({
   const durationMs = finishedAt.getTime() - startedAt.getTime();
   const outputDirectory = outputFiles[0] ? path.dirname(outputFiles[0]) : path.resolve(outputDir);
 
-  let outcome = 'success';
-  if (cityFailures === totalCities) {
-    outcome = 'failed';
-  } else if (cityFailures > 0) {
-    outcome = 'partial';
-  } else if (totalResults === 0) {
-    outcome = 'empty';
-  }
+  const outcome = determineOutcome(cityFailures, totalCities, totalResults);
 
   return {
     startedAt: startedAt.toISOString(),
