@@ -5,7 +5,7 @@ const LISTING_LINK_SELECTOR = 'a[href*="/maps/place/"], a[href*="/place/"]';
 const STRONG_POSITIVE_HINT_REGEX =
   /\b(hostel|hostels|hostal|hostals|albergue|alberg|alberg juvenil|youth hostel|backpacker|backpackers)\b/i;
 const WEAK_POSITIVE_HINT_REGEX =
-  /\b(guest ?house|boarding house|pension|pensio|residencia de estudiantes|residencia estudiantes|residencia universitaria|residencia universitaria|residencia universitaria resa|student residence|student housing|residence hall|residencia d'estudiants|residencia estudiants)\b/i;
+  /\b(guest ?house|boarding house|pension|pensio|residencia de estudiantes|residencia estudiantes|residencia universitaria|residencia universitaria resa|student residence|student housing|residence hall|residencia d'estudiants|residencia estudiants)\b/i;
 const STRONG_NEGATIVE_HINT_REGEX = /\b(hotel|hotels|resort|resorts|apartahotel|apartment hotel)\b/i;
 const WEAK_NEGATIVE_HINT_REGEX =
   /\b(apartment|apartments|vacation rental|holiday apartment|suite|suites|villa|villas)\b/i;
@@ -202,8 +202,9 @@ export async function scrapeCity(page, detailPage, options) {
           index: candidateIndex,
           totalListings: seenListingUrls.size,
           listingUrl,
-          message: error.message,
+          message: error?.message ?? String(error),
         });
+        await sleep(detailPauseMs);
       }
     }
   }

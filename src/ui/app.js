@@ -69,8 +69,9 @@ elements.form.addEventListener('submit', (event) => {
 
 bootstrap().catch((error) => {
   state.bootstrapFailed = true;
-  appendLog(`Failed to load the app: ${error.message}`, 'error');
-  elements.statusCopy.textContent = error.message;
+  const message = error?.message ?? String(error);
+  appendLog(`Failed to load the app: ${message}`, 'error');
+  elements.statusCopy.textContent = message;
   elements.statusPhase.textContent = 'Error';
   renderRunButton();
   renderStatus();

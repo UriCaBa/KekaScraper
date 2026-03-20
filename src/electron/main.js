@@ -240,7 +240,7 @@ function buildRunConfig(formState) {
     browserChannel: formState.browserChannel,
     headless: !formState.headful,
     enrichWebsite: formState.enrichWebsite,
-    websitePageLimit: resolveDesktopWebsitePageLimit(formState),
+    websitePageLimit: resolveDesktopWebsitePageLimit(),
     outputDir: getDesktopOutputDirectory(),
     allowBundledChromium: !app.isPackaged,
   };
@@ -353,10 +353,8 @@ function asPlainObject(value) {
   return value;
 }
 
-function resolveDesktopWebsitePageLimit(formState) {
-  const automaticLimit = normalizeInteger(formState.resultLimit, defaultConfig.resultLimit, 'resultLimit');
-
-  return automaticLimit;
+function resolveDesktopWebsitePageLimit() {
+  return defaultConfig.websitePageLimit;
 }
 
 async function runSmokeScrape(runConfig) {

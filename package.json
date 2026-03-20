@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Reusable Google Maps hostel scraper for one or more cities.",
   "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "main": "src/cli.js",
   "scripts": {
     "start": "electron src/electron/main.js",

@@ -195,7 +195,12 @@ async function startStaticServer() {
     try {
       const requestPath = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
       const relativePath = requestPath === '/' ? 'src/ui/index.html' : requestPath.replace(/^\/+/, '');
-      const filePath = path.join(rootDir, relativePath);
+      const filePath = path.resolve(rootDir, relativePath);
+
+      if (filePath !== rootDir && !filePath.startsWith(rootDir + path.sep)) {
+        throw new Error('Invalid path');
+      }
+
       const body = await readFile(filePath);
 
       response.statusCode = 200;

@@ -105,7 +105,8 @@ export async function enrichListings(listings, options, hooks = {}) {
     }
 
     try {
-      const cacheKey = getEnrichmentCacheKey(listing.website);
+      const urlKey = getEnrichmentCacheKey(listing.website);
+      const cacheKey = urlKey ? `${urlKey}::${listing.searchedCity ?? ''}` : null;
       let enrichmentTask = cacheKey ? enrichmentTaskCache.get(cacheKey) : null;
 
       if (!enrichmentTask) {
