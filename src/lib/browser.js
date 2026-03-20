@@ -1,11 +1,5 @@
 import { chromium } from 'playwright';
-import {
-  CHROME_USER_AGENTS,
-  VIEWPORT_POOL,
-  STEALTH_INIT_SCRIPT,
-  getStealthLaunchArgs,
-  pickRandom,
-} from './stealth.js';
+import { CHROME_USER_AGENTS, VIEWPORT_POOL, STEALTH_INIT_SCRIPT, getStealthLaunchArgs, pickRandom } from './stealth.js';
 
 export async function launchBrowser(options) {
   const {

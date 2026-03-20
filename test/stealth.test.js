@@ -1,11 +1,5 @@
 import assert from 'node:assert/strict';
-import {
-  CHROME_USER_AGENTS,
-  VIEWPORT_POOL,
-  getStealthLaunchArgs,
-  jitter,
-  pickRandom,
-} from '../src/lib/stealth.js';
+import { CHROME_USER_AGENTS, VIEWPORT_POOL, getStealthLaunchArgs, jitter, pickRandom } from '../src/lib/stealth.js';
 
 export const tests = [
   {
@@ -22,8 +16,14 @@ export const tests = [
   {
     name: 'pickRandom returns undefined for empty array',
     run() {
-      assert.equal(pickRandom([], () => 0), undefined);
-      assert.equal(pickRandom(null, () => 0), undefined);
+      assert.equal(
+        pickRandom([], () => 0),
+        undefined,
+      );
+      assert.equal(
+        pickRandom(null, () => 0),
+        undefined,
+      );
     },
   },
   {
