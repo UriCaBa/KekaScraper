@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { buildCityCompletedPayload } from '../src/lib/run-scrape.js';
+import { buildCityCompletedPayload, determineOutcome } from '../src/lib/run-scrape.js';
 
 export const tests = [
   {
@@ -58,6 +58,16 @@ export const tests = [
         listingsSkipped: 0,
         listingFailures: 0,
       });
+    },
+  },
+  {
+    name: 'determineOutcome returns empty when partial run has zero results',
+    run: () => {
+      assert.equal(determineOutcome(3, 3, 0), 'failed');
+      assert.equal(determineOutcome(2, 3, 0), 'empty');
+      assert.equal(determineOutcome(2, 3, 5), 'partial');
+      assert.equal(determineOutcome(0, 3, 10), 'success');
+      assert.equal(determineOutcome(0, 1, 0), 'empty');
     },
   },
 ];

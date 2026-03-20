@@ -276,7 +276,20 @@ async function fetchHtmlPage(url, options) {
       throw new Error(`Unsupported content type: ${contentType}`);
     }
 
-    const html = await response.text();
+    const charsetMatch = contentType.match(/charset\s*=\s*["']?([^"';\s]+)/i);
+    const charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
+
+    let html;
+    if (charset !== 'utf-8' && charset !== 'utf8') {
+      try {
+        const buffer = await response.arrayBuffer();
+        html = new TextDecoder(charset).decode(buffer);
+      } catch {
+        html = await response.text();
+      }
+    } else {
+      html = await response.text();
+    }
     const lines = htmlToLines(html);
 
     return {
@@ -318,6 +331,11 @@ async function crawlWebsite(homepage, options, onEvent = () => {}) {
     try {
       const page = await fetchHtmlPage(next.url, options);
       scannedPages.push(page);
+
+      const finalKey = normalizePageKey(page.finalUrl);
+      if (finalKey !== pageKey) {
+        visited.add(finalKey);
+      }
 
       for (const candidate of scoreAnchors(homepage.finalUrl, page.anchors)) {
         if (!visited.has(normalizePageKey(candidate.url))) {
@@ -386,10 +404,24 @@ function stripTags(value) {
   return value.replace(/<[^>]+>/g, ' ');
 }
 
-function extractEmails(value) {
+export function extractEmails(value) {
   const normalizedValue = decodeEscapedUnicode(value);
   const matches = normalizedValue.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
-  return uniqueNonEmpty(matches.filter((email) => !/\.(png|jpg|jpeg|svg|webp)$/i.test(email)));
+  return uniqueNonEmpty(
+    matches.filter((email) => {
+      if (/\.(png|jpg|jpeg|svg|webp|gif|bmp|ico|css|js|woff|woff2|ttf|eot|map)$/i.test(email)) {
+        return false;
+      }
+      const localPart = email.split('@')[0];
+      if (/\.\./.test(localPart)) {
+        return false;
+      }
+      if (/^[._%+-]|[._%+-]$/.test(localPart)) {
+        return false;
+      }
+      return true;
+    }),
+  );
 }
 
 function extractPhones(value) {

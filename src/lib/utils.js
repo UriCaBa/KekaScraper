@@ -33,7 +33,7 @@ export async function retry(task, options = {}) {
         retries,
         message: error.message,
       });
-      await sleep(delayMs);
+      await sleep(delayMs * Math.min(2 ** (attempt - 1), 8));
     }
   }
 
@@ -102,7 +102,15 @@ export function parseNumber(value) {
     return null;
   }
 
-  const digits = String(value).replace(/[^\d]/g, '');
+  const str = String(value).trim();
+
+  // Reject values that look like decimals (e.g. "4,5" or "4.5").
+  // parseNumber is for integers only (review counts, capacities).
+  if (/^\d+[.,]\d{1,2}$/.test(str)) {
+    return null;
+  }
+
+  const digits = str.replace(/[^\d]/g, '');
   if (!digits) {
     return null;
   }
