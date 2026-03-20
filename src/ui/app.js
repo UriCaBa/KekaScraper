@@ -490,7 +490,7 @@ function renderRunButton() {
 }
 
 function getBridge() {
-  const bridge = window.kekaApp;
+  const bridge = window.oricalApp;
   if (!bridge || typeof bridge !== 'object') {
     throw new Error('Desktop bridge unavailable. Reload the app.');
   }

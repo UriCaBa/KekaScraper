@@ -83,7 +83,7 @@ try {
         }
       }
 
-      window.kekaApp = {
+      window.oricalApp = {
         getDefaults: async () => structuredClone(nextDefaults),
         startScrape: async (payload) => {
           window.__KEKA_SMOKE_START_PAYLOAD = structuredClone(payload);

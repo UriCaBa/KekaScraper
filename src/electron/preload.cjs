@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('kekaApp', {
+contextBridge.exposeInMainWorld('oricalApp', {
   getDefaults: () => ipcRenderer.invoke('app:get-defaults'),
   startScrape: (payload) => ipcRenderer.invoke('scrape:start', payload),
   openOutputFolder: () => ipcRenderer.invoke('scrape:open-output-folder'),
