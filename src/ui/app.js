@@ -1,8 +1,16 @@
 import { RUN_EVENT_TYPES } from '../lib/run-events.js';
 import { countUniqueCities, normalizePublicUrl } from '../shared/input-normalization.js';
+import {
+  buildCompletionMessage as formatCompletionMessage,
+  deriveResultsView,
+  deriveRunButtonView,
+  deriveStatusView,
+  formatDuration as formatRunDuration,
+} from './view-model.js';
 
 const state = {
   initialized: false,
+  bootstrapFailed: false,
   outputDirectory: '',
   running: false,
   formDisabled: false,
@@ -21,7 +29,6 @@ const elements = {
   form: document.querySelector('#scrape-form'),
   cities: document.querySelector('#cities'),
   resultLimit: document.querySelector('#result-limit'),
-  websitePageLimit: document.querySelector('#website-page-limit'),
   browserChannel: document.querySelector('#browser-channel'),
   browserChannelHelp: document.querySelector('#browser-channel-help'),
   enrichWebsite: document.querySelector('#enrich-website'),
@@ -48,6 +55,11 @@ elements.runButton.textContent = 'Loading...';
 setFormDisabled(true);
 elements.form.addEventListener('submit', (event) => {
   event.preventDefault();
+  if (state.bootstrapFailed) {
+    window.location.reload();
+    return;
+  }
+
   if (!state.initialized || state.formDisabled) {
     return;
   }
@@ -56,14 +68,18 @@ elements.form.addEventListener('submit', (event) => {
 });
 
 bootstrap().catch((error) => {
-  appendLog(`Failed to load the app: ${error.message}`, 'error');
-  elements.statusCopy.textContent = error.message;
+  state.bootstrapFailed = true;
+  const message = error?.message ?? String(error);
+  appendLog(`Failed to load the app: ${message}`, 'error');
+  elements.statusCopy.textContent = message;
   elements.statusPhase.textContent = 'Error';
+  renderRunButton();
   renderStatus();
 });
 
 async function bootstrap() {
-  const initialData = await window.kekaApp.getDefaults();
+  const bridge = getBridge();
+  const initialData = await bridge.getDefaults();
   state.outputDirectory = initialData.outputDirectory;
   const initialFormState = { ...initialData.formState };
 
@@ -79,19 +95,18 @@ async function bootstrap() {
 
   elements.openOutputFolderButton.addEventListener('click', async () => {
     if (state.outputDirectory) {
-      await runUiAction(
-        () => window.kekaApp.openOutputFolder(),
-        'Failed to open the output folder',
-      );
+      await runUiAction(() => bridge.openOutputFolder(), 'Failed to open the output folder');
     }
   });
 
-  window.kekaApp.onScrapeEvent((event) => {
+  bridge.onScrapeEvent((event) => {
     handleScrapeEvent(event);
   });
 
   state.initialized = true;
+  state.bootstrapFailed = false;
   setFormDisabled(false);
+  renderStatus();
 }
 
 async function handleSubmit() {
@@ -121,7 +136,7 @@ async function handleSubmit() {
   renderStatus();
 
   try {
-    const result = await window.kekaApp.startScrape(payload);
+    const result = await getBridge().startScrape(payload);
     state.results = result.previewResults ?? (result.results ?? []).slice(0, RESULTS_PREVIEW_LIMIT);
     state.outputFiles = result.outputFiles;
     state.lastCompletedSummary = result.summary;
@@ -130,7 +145,7 @@ async function handleSubmit() {
     state.completedCities = result.summary.totalCities;
     state.totalCities = result.summary.totalCities;
     elements.outputDirectory.textContent = result.summary.outputDirectory;
-    appendLog(buildCompletionMessage(result.summary));
+    appendLog(formatCompletionMessage(result.summary));
   } catch (error) {
     appendLog(error.message, 'error');
     elements.statusCopy.textContent = error.message;
@@ -144,12 +159,16 @@ async function handleSubmit() {
 }
 
 function handleScrapeEvent(event) {
+  if (!event || typeof event !== 'object' || typeof event.type !== 'string') {
+    return;
+  }
+
   switch (event.type) {
     case RUN_EVENT_TYPES.RUN_STARTED:
-      state.totalCities = event.cities.length;
+      state.totalCities = Array.isArray(event.cities) ? event.cities.length : 0;
       elements.statusPhase.textContent = 'Launching';
-      elements.statusCopy.textContent = `Starting a local scrape. Files will be written to ${event.outputDirectory}.`;
-      appendLog(`Starting local scrape. Output folder: ${event.outputDirectory}`);
+      elements.statusCopy.textContent = `Starting a local scrape. Files will be written to ${event.outputDirectory ?? state.outputDirectory}.`;
+      appendLog(`Starting local scrape. Output folder: ${event.outputDirectory ?? state.outputDirectory}`);
       break;
     case RUN_EVENT_TYPES.BROWSER_READY:
       elements.statusPhase.textContent = 'Scraping';
@@ -161,7 +180,16 @@ function handleScrapeEvent(event) {
       appendLog(`City ${event.index}/${event.totalCities}: ${event.city}`);
       break;
     case RUN_EVENT_TYPES.CITY_SEARCH_RESULTS:
-      appendLog(`${event.city}: found ${event.candidateCount} candidate Google Maps URLs.`);
+      if (typeof event.aggregatedCandidateCount === 'number') {
+        appendLog(
+          `${event.city}: found ${event.candidateCount} candidate Google Maps URLs (${event.aggregatedCandidateCount} unique total so far).`,
+        );
+      } else {
+        appendLog(`${event.city}: found ${event.candidateCount} candidate Google Maps URLs.`);
+      }
+      break;
+    case RUN_EVENT_TYPES.LISTING_SKIPPED:
+      appendLog(`Skipping ${event.name ?? event.listingUrl ?? 'listing'} (${formatListingSkipReason(event)}).`);
       break;
     case RUN_EVENT_TYPES.RETRYING:
       appendLog(`Retrying ${event.label}: ${event.message}`, 'error');
@@ -173,6 +201,11 @@ function handleScrapeEvent(event) {
       appendLog(
         `${event.city} completed. ${event.cityResultCount} matches kept, ${event.totalResultCount} total so far.`,
       );
+      if (event.cityStats) {
+        appendLog(
+          `${event.city}: processed ${event.cityStats.listingsProcessed} candidates, kept ${event.cityStats.listingsAccepted}, skipped ${event.cityStats.listingsSkipped}, failed ${event.cityStats.listingFailures}.`,
+        );
+      }
       break;
     case RUN_EVENT_TYPES.LISTING_FAILED:
       appendLog(`Listing failed for ${event.city}: ${event.message}`, 'error');
@@ -203,10 +236,14 @@ function handleScrapeEvent(event) {
       appendLog(`Skipping subpage ${event.url}: ${event.message}`, 'error');
       break;
     case RUN_EVENT_TYPES.RUN_COMPLETED:
-      state.totalResults = event.summary.totalResults;
-      state.completedCities = event.summary.totalCities;
+      if (!event.summary || typeof event.summary !== 'object') {
+        break;
+      }
+
+      state.totalResults = event.summary.totalResults ?? state.totalResults;
+      state.completedCities = event.summary.totalCities ?? state.completedCities;
       elements.statusPhase.textContent = 'Completed';
-      elements.statusCopy.textContent = `Finished with ${event.summary.totalResults} rows in ${formatDuration(event.summary.durationMs)}.`;
+      elements.statusCopy.textContent = `Finished with ${event.summary.totalResults ?? state.totalResults} rows in ${formatRunDuration(event.summary.durationMs)}.`;
       break;
     default:
       break;
@@ -216,12 +253,15 @@ function handleScrapeEvent(event) {
 }
 
 function renderStatus() {
-  if (!state.initialized && state.logs.length === 0) {
-    elements.statusCopy.textContent = 'Loading local defaults...';
-    elements.statusPhase.textContent = 'Loading';
-  } else if (!state.running && state.logs.length === 0) {
-    elements.statusCopy.textContent = 'Ready to start.';
-    elements.statusPhase.textContent = 'Idle';
+  const statusView = deriveStatusView({
+    initialized: state.initialized,
+    running: state.running,
+    logsCount: state.logs.length,
+  });
+
+  if (statusView) {
+    elements.statusCopy.textContent = statusView.copy;
+    elements.statusPhase.textContent = statusView.phase;
   }
 
   elements.statusResults.textContent = `${state.totalResults}`;
@@ -232,23 +272,21 @@ function renderStatus() {
 }
 
 function renderResults() {
-  const hasCompletedRun = Boolean(state.lastCompletedSummary);
-  elements.resultsEmpty.hidden = hasCompletedRun;
-  elements.resultsContent.hidden = !hasCompletedRun;
+  const resultsView = deriveResultsView({
+    lastCompletedSummary: state.lastCompletedSummary,
+    results: state.results,
+  });
+  elements.resultsEmpty.hidden = resultsView.resultsEmptyHidden;
+  elements.resultsContent.hidden = resultsView.resultsContentHidden;
 
-  if (!hasCompletedRun) {
+  if (!resultsView.hasCompletedRun) {
     elements.resultsTableBody.replaceChildren();
     elements.outputFiles.replaceChildren();
-    elements.resultsSummary.textContent = '0 rows';
+    elements.resultsSummary.textContent = resultsView.resultsSummary;
     return;
   }
 
-  const rowCount = state.lastCompletedSummary.totalResults;
-  const previewCount = state.results.length;
-  const previewLabel = rowCount > previewCount
-    ? `, showing first ${previewCount}`
-    : '';
-  elements.resultsSummary.textContent = `${rowCount} ${rowCount === 1 ? 'row' : 'rows'}${previewLabel}`;
+  elements.resultsSummary.textContent = resultsView.resultsSummary;
   renderResultRows();
   renderOutputFiles();
 }
@@ -256,7 +294,6 @@ function renderResults() {
 function populateForm(formState) {
   elements.cities.value = formState.citiesText ?? '';
   elements.resultLimit.value = formState.resultLimit ?? 20;
-  elements.websitePageLimit.value = formState.websitePageLimit ?? 8;
   elements.browserChannel.value = formState.browserChannel ?? 'auto';
   elements.enrichWebsite.checked = formState.enrichWebsite !== false;
   elements.headful.checked = Boolean(formState.headful);
@@ -303,7 +340,6 @@ function readFormState() {
   return {
     citiesText,
     resultLimit: elements.resultLimit.value,
-    websitePageLimit: elements.websitePageLimit.value,
     browserChannel: elements.browserChannel.value,
     enrichWebsite: elements.enrichWebsite.checked,
     headful: elements.headful.checked,
@@ -317,7 +353,6 @@ function setFormDisabled(disabled) {
   for (const element of [
     elements.cities,
     elements.resultLimit,
-    elements.websitePageLimit,
     elements.browserChannel,
     elements.enrichWebsite,
     elements.headful,
@@ -326,16 +361,12 @@ function setFormDisabled(disabled) {
     element.disabled = disabled;
   }
 
-  elements.runButton.disabled = disabled || !state.initialized;
-  elements.runButton.textContent = disabled ? 'Running...' : state.initialized ? 'Start scrape' : 'Loading...';
+  renderRunButton();
   syncFormatSelection();
 }
 
 function appendLog(message, tone = 'info') {
-  state.logs = [
-    ...state.logs,
-    { message, tone },
-  ].slice(-120);
+  state.logs = [...state.logs, { message, tone }].slice(-120);
 }
 
 async function runUiAction(action, failureLabel) {
@@ -350,24 +381,8 @@ async function runUiAction(action, failureLabel) {
   }
 }
 
-function buildCompletionMessage(summary) {
-  const fileCount = summary.outputFiles.length;
-  return `Run ${summary.outcome}. ${summary.totalResults} rows exported to ${fileCount} ${fileCount === 1 ? 'file' : 'files'}.`;
-}
-
 function countCities(citiesText) {
   return countUniqueCities(citiesText);
-}
-
-function formatDuration(durationMs) {
-  const seconds = Math.max(1, Math.round(durationMs / 1000));
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}m ${remainingSeconds}s`;
 }
 
 function sanitizeExternalUrl(value) {
@@ -383,9 +398,7 @@ function syncFormatSelection() {
   }
 
   const checkedCount = elements.formatCheckboxes.filter((checkbox) => checkbox.checked).length;
-  const lastChecked = checkedCount === 1
-    ? elements.formatCheckboxes.find((checkbox) => checkbox.checked)
-    : null;
+  const lastChecked = checkedCount === 1 ? elements.formatCheckboxes.find((checkbox) => checkbox.checked) : null;
 
   for (const checkbox of elements.formatCheckboxes) {
     checkbox.disabled = checkedCount === 1 && checkbox === lastChecked;
@@ -434,10 +447,7 @@ function renderOutputFiles() {
     button.className = 'secondary output-file';
     button.textContent = fileName;
     button.addEventListener('click', async () => {
-      await runUiAction(
-        () => window.kekaApp.openOutputFile(filePath),
-        `Failed to open ${fileName}`,
-      );
+      await runUiAction(() => getBridge().openOutputFile(filePath), `Failed to open ${fileName}`);
     });
     fragment.append(button);
   }
@@ -463,11 +473,51 @@ function createWebsiteCell(url) {
   button.className = 'secondary external-link';
   button.textContent = safeUrl;
   button.addEventListener('click', async () => {
-    await runUiAction(
-      () => window.kekaApp.openExternalUrl(safeUrl),
-      `Failed to open ${safeUrl}`,
-    );
+    await runUiAction(() => getBridge().openExternalUrl(safeUrl), `Failed to open ${safeUrl}`);
   });
   cell.append(button);
   return cell;
+}
+
+function renderRunButton() {
+  const buttonView = deriveRunButtonView({
+    initialized: state.initialized,
+    formDisabled: state.formDisabled,
+    bootstrapFailed: state.bootstrapFailed,
+  });
+  elements.runButton.disabled = buttonView.disabled;
+  elements.runButton.textContent = buttonView.text;
+}
+
+function getBridge() {
+  const bridge = window.kekaApp;
+  if (!bridge || typeof bridge !== 'object') {
+    throw new Error('Desktop bridge unavailable. Reload the app.');
+  }
+
+  for (const methodName of [
+    'getDefaults',
+    'startScrape',
+    'openOutputFolder',
+    'openOutputFile',
+    'openExternalUrl',
+    'onScrapeEvent',
+  ]) {
+    if (typeof bridge[methodName] !== 'function') {
+      throw new Error(`Desktop bridge missing "${methodName}". Reload the app.`);
+    }
+  }
+
+  return bridge;
+}
+
+function formatListingSkipReason(event) {
+  const scoreText = typeof event.score === 'number' ? `score=${event.score}` : null;
+  const signals = [
+    ...(Array.isArray(event.positiveSignals) ? event.positiveSignals : []),
+    ...(Array.isArray(event.negativeSignals) ? event.negativeSignals : []),
+  ];
+  return [event.reason ?? 'skipped', scoreText, signals.length ? `signals=${signals.join(',')}` : null]
+    .filter(Boolean)
+    .join(' | ');
 }

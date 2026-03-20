@@ -11,8 +11,8 @@
   --radius-xl: 28px;
   --radius-lg: 18px;
   --radius-md: 12px;
-  --font-sans: "Aptos", "Segoe UI Variable", "SF Pro Display", "Segoe UI", sans-serif;
-  --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --font-sans: 'Aptos', 'Segoe UI Variable', 'SF Pro Display', 'Segoe UI', sans-serif;
+  --font-serif: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif;
 }
 
 * {
@@ -210,7 +210,9 @@ button {
   background: var(--accent);
   color: white;
   cursor: pointer;
-  transition: transform 140ms ease, background 140ms ease;
+  transition:
+    transform 140ms ease,
+    background 140ms ease;
 }
 
 button:hover:not(:disabled) {

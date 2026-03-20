@@ -1,5 +1,15 @@
-import { firstNonEmpty, normalizeUrl, normalizeWhitespace, parseNumber, retry, uniqueNonEmpty } from './utils.js';
+import {
+  firstNonEmpty,
+  mapWithConcurrency,
+  normalizeUrl,
+  normalizeWhitespace,
+  parseNumber,
+  retry,
+  uniqueNonEmpty,
+} from './utils.js';
 import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
+
+const WEBSITE_ENRICH_CONCURRENCY = 3;
 
 const CONTACT_KEYWORDS = [
   'contact',
@@ -73,9 +83,9 @@ const ROLE_THEN_NAME_REGEX = new RegExp(
 
 export async function enrichListings(listings, options, hooks = {}) {
   const emit = typeof hooks.onEvent === 'function' ? hooks.onEvent : () => {};
-  const enriched = [];
+  const enrichmentTaskCache = new Map();
 
-  for (const [index, listing] of listings.entries()) {
+  return mapWithConcurrency(listings, WEBSITE_ENRICH_CONCURRENCY, async (listing, index) => {
     emitRunEvent(emit, RUN_EVENT_TYPES.ENRICHMENT_ITEM_STARTED, {
       index: index + 1,
       totalListings: listings.length,
@@ -84,7 +94,6 @@ export async function enrichListings(listings, options, hooks = {}) {
     });
 
     if (!listing.website || !options.enrichWebsite) {
-      enriched.push(withDefaultEnrichment(listing));
       emitRunEvent(emit, RUN_EVENT_TYPES.ENRICHMENT_ITEM_SKIPPED, {
         index: index + 1,
         totalListings: listings.length,
@@ -92,13 +101,16 @@ export async function enrichListings(listings, options, hooks = {}) {
         website: listing.website ?? null,
         reason: listing.website ? 'disabled' : 'no-website',
       });
-      continue;
+      return withDefaultEnrichment(listing);
     }
 
     try {
-      const enrichment = await retry(
-        () => enrichFromWebsite(listing, options, { onEvent: emit }),
-        {
+      const urlKey = getEnrichmentCacheKey(listing.website);
+      const cacheKey = urlKey ? `${urlKey}::${listing.searchedCity ?? ''}` : null;
+      let enrichmentTask = cacheKey ? enrichmentTaskCache.get(cacheKey) : null;
+
+      if (!enrichmentTask) {
+        enrichmentTask = retry(() => enrichFromWebsite(listing, options, { onEvent: emit }), {
           retries: options.retryCount,
           delayMs: options.retryDelayMs,
           label: `enrich website ${listing.website}`,
@@ -109,23 +121,27 @@ export async function enrichListings(listings, options, hooks = {}) {
             name: listing.name ?? null,
             website: listing.website ?? null,
           },
-        },
-      );
+        });
 
-      enriched.push({
+        if (cacheKey) {
+          enrichmentTaskCache.set(cacheKey, enrichmentTask);
+        }
+      }
+
+      const enrichment = await enrichmentTask;
+
+      const enrichedListing = {
         ...withDefaultEnrichment(listing),
         ...enrichment,
-      });
+      };
       emitRunEvent(emit, RUN_EVENT_TYPES.ENRICHMENT_ITEM_COMPLETED, {
         index: index + 1,
         totalListings: listings.length,
         name: listing.name ?? null,
         website: listing.website ?? null,
       });
+      return enrichedListing;
     } catch (error) {
-      enriched.push(withDefaultEnrichment(listing, {
-        websiteScanStatus: 'failed',
-      }));
       emitRunEvent(emit, RUN_EVENT_TYPES.ENRICHMENT_ITEM_FAILED, {
         index: index + 1,
         totalListings: listings.length,
@@ -133,10 +149,11 @@ export async function enrichListings(listings, options, hooks = {}) {
         website: listing.website ?? null,
         message: error.message,
       });
+      return withDefaultEnrichment(listing, {
+        websiteScanStatus: 'failed',
+      });
     }
-  }
-
-  return enriched;
+  });
 }
 
 async function enrichFromWebsite(listing, options, hooks = {}) {
@@ -219,12 +236,14 @@ function withDefaultEnrichment(listing, overrides = {}) {
     roomCount: null,
     bedCount: null,
     websitePhone: null,
-    bestContactChannel: listing.phone ? 'phone' : (listing.website ? 'website' : null),
+    bestContactChannel: listing.phone ? 'phone' : listing.website ? 'website' : null,
     bestContactValue: listing.phone ?? listing.website ?? null,
     bestContactSourceUrl: listing.googleMapsUrl ?? listing.website ?? null,
     contactStrategy: listing.phone
       ? 'Call the public business phone and ask who handles management software.'
-      : (listing.website ? 'Use the public website or website contact page as the first outreach path.' : null),
+      : listing.website
+        ? 'Use the public website or website contact page as the first outreach path.'
+        : null,
     publicContactSourceUrls: listing.website ?? listing.googleMapsUrl ?? null,
     lastSeenAt: new Date().toISOString(),
     websiteScanStatus: listing.website ? 'skipped' : 'no-website',
@@ -338,11 +357,11 @@ function extractAnchors(html, baseUrl) {
 function htmlToLines(html) {
   const text = decodeEscapedUnicode(
     decodeHtmlEntities(
-    html
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<(br|\/p|\/div|\/li|\/section|\/article|\/h\d|\/tr)>/gi, '\n')
-      .replace(/<[^>]+>/g, ' '),
+      html
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<(br|\/p|\/div|\/li|\/section|\/article|\/h\d|\/tr)>/gi, '\n')
+        .replace(/<[^>]+>/g, ' '),
     ),
   );
 
@@ -370,9 +389,7 @@ function stripTags(value) {
 function extractEmails(value) {
   const normalizedValue = decodeEscapedUnicode(value);
   const matches = normalizedValue.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
-  return uniqueNonEmpty(
-    matches.filter((email) => !/\.(png|jpg|jpeg|svg|webp)$/i.test(email)),
-  );
+  return uniqueNonEmpty(matches.filter((email) => !/\.(png|jpg|jpeg|svg|webp)$/i.test(email)));
 }
 
 function extractPhones(value) {
@@ -423,7 +440,10 @@ function buildDecisionMakerFromContext(page, lineIndex, name, role) {
 
 function emailLooksLikePerson(email, name) {
   const localPart = email.toLowerCase().split('@')[0];
-  const parts = name.toLowerCase().split(/\s+/).filter((part) => part.length >= 3);
+  const parts = name
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((part) => part.length >= 3);
   return parts.length >= 2 && parts.some((part) => localPart.includes(part.slice(0, 3)));
 }
 
@@ -533,36 +553,6 @@ function normalizePageKey(url) {
   }
 }
 
-function isRelevantBusinessEmail(email, websiteDomain, listing) {
-  const [, domain = ''] = email.toLowerCase().split('@');
-  const cleanDomain = websiteDomain.toLowerCase();
-  const websiteRoot = normalizeDomainRoot(cleanDomain);
-  const emailRoot = normalizeDomainRoot(domain);
-
-  if (!domain) {
-    return false;
-  }
-
-  if (domain === cleanDomain || domain.endsWith(`.${cleanDomain}`) || cleanDomain.endsWith(`.${domain}`)) {
-    return true;
-  }
-
-  if (emailRoot && websiteRoot && emailRoot === websiteRoot) {
-    return true;
-  }
-
-  const cityTokens = buildListingTokens(listing?.searchedCity);
-  if (cityTokens.some((token) => email.toLowerCase().includes(token)) && emailRoot === websiteRoot) {
-    return true;
-  }
-
-  if (/google\.com$|googlemail\.com$|facebook\.com$|instagram\.com$|cloudflare\.com$/i.test(domain)) {
-    return false;
-  }
-
-  return false;
-}
-
 function buildEmailCandidates(scannedPages, websiteDomain, listing) {
   const byEmail = new Map();
 
@@ -614,7 +604,18 @@ function rankEmailCandidate(email, sourceUrls, websiteDomain, listing) {
     reasons.push('external-domain');
   }
 
-  const preferredPrefixes = ['info', 'hello', 'contact', 'booking', 'bookings', 'reserv', 'stay', 'hostel', 'admin', 'sales'];
+  const preferredPrefixes = [
+    'info',
+    'hello',
+    'contact',
+    'booking',
+    'bookings',
+    'reserv',
+    'stay',
+    'hostel',
+    'admin',
+    'sales',
+  ];
   if (preferredPrefixes.some((prefix) => localPart.includes(prefix))) {
     score += 20;
     reasons.push('business-prefix');
@@ -646,7 +647,7 @@ function rankEmailCandidate(email, sourceUrls, websiteDomain, listing) {
     reasons.push('found-multiple-times');
   }
 
-  const confidence = score >= 50 ? 'high' : (score >= 25 ? 'medium' : 'low');
+  const confidence = score >= 50 ? 'high' : score >= 25 ? 'medium' : 'low';
 
   return {
     email,
@@ -677,8 +678,10 @@ function buildListingTokens(value) {
 }
 
 function findContactFormPage(scannedPages) {
-  return scannedPages.find((page) => page.hasForm && /contact|contacto|contacte|booking|reserv/i.test(page.finalUrl))
-    ?? scannedPages.find((page) => page.hasForm);
+  return (
+    scannedPages.find((page) => page.hasForm && /contact|contacto|contacte|booking|reserv/i.test(page.finalUrl)) ??
+    scannedPages.find((page) => page.hasForm)
+  );
 }
 
 function selectBestContact({ generalEmail, contactFormUrl, websitePhone, decisionMaker, homepage }) {
@@ -705,7 +708,8 @@ function selectBestContact({ generalEmail, contactFormUrl, websitePhone, decisio
       channel: 'contact-form',
       value: contactFormUrl,
       sourceUrl: contactFormUrl,
-      strategy: 'Use the public contact form and ask to be redirected to the person responsible for operations or software.',
+      strategy:
+        'Use the public contact form and ask to be redirected to the person responsible for operations or software.',
     };
   }
 
@@ -724,4 +728,20 @@ function selectBestContact({ generalEmail, contactFormUrl, websitePhone, decisio
     sourceUrl: homepage.finalUrl,
     strategy: 'Use the public website as the fallback contact source.',
   };
+}
+
+export function getEnrichmentCacheKey(value) {
+  const normalizedUrl = normalizeUrl(value);
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(normalizedUrl);
+    parsed.hash = '';
+    parsed.search = '';
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return null;
+  }
 }

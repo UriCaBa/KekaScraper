@@ -3,11 +3,7 @@ import path from 'node:path';
 import { ensureDir, toCsv } from './utils.js';
 
 export async function writeOutputs(items, options) {
-  const {
-    outputDir,
-    baseFilename,
-    formats,
-  } = options;
+  const { outputDir, baseFilename, formats } = options;
 
   await ensureDir(outputDir);
 

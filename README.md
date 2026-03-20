@@ -77,6 +77,7 @@ npm run dist
 
 The desktop app stores exported results in your Documents folder under `KekaScraper/output` and remembers the last basic settings locally on the same machine.
 It defaults to JSON output to match the CLI. Enable CSV explicitly in the form when you need it.
+Website enrichment in the desktop app scans hostel sites automatically; there is no separate per-site page limit field in the UI.
 Current packaged desktop builds are configured around system browsers. For the smoothest first-run experience on client machines, keep Microsoft Edge or Google Chrome installed and use `Auto`, `Microsoft Edge`, or `Google Chrome` in the app.
 
 ## CLI usage
@@ -110,6 +111,23 @@ Run in visible browser mode:
 ```bash
 npm run scrape -- --cities "Barcelona" --headful
 ```
+
+## Smoke tests
+
+Use the renderer smoke test when you want a stable Playwright check of the desktop UI logic without launching Electron:
+
+```bash
+npm run smoke:renderer
+```
+
+Use the Electron smoke test on a real local desktop session when you want to validate the packaged app shell, preload bridge, and renderer together:
+
+```bash
+npm run smoke:electron
+```
+
+`smoke:renderer` uses a fake desktop bridge and a local static server, so it is suitable for CI or restricted environments where Electron windows cannot open.
+`smoke:electron` launches the actual Electron app in `KEKA_SMOKE_MODE=1`, which avoids real scraping and browser automation against Google Maps, but it still requires GUI access.
 
 ## CLI options
 

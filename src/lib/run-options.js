@@ -32,12 +32,9 @@ export function normalizeRunOptions(input = {}, { requireCities = true } = {}) {
       'navigationTimeoutMs',
       { min: 1 },
     ),
-    actionTimeoutMs: normalizeInteger(
-      input.actionTimeoutMs,
-      defaultConfig.actionTimeoutMs,
-      'actionTimeoutMs',
-      { min: 1 },
-    ),
+    actionTimeoutMs: normalizeInteger(input.actionTimeoutMs, defaultConfig.actionTimeoutMs, 'actionTimeoutMs', {
+      min: 1,
+    }),
     websiteFetchTimeoutMs: normalizeInteger(
       input.websiteFetchTimeoutMs,
       defaultConfig.websiteFetchTimeoutMs,
@@ -52,9 +49,7 @@ export function normalizeRunOptions(input = {}, { requireCities = true } = {}) {
 export function normalizeBrowserChannel(value, flagName = 'browserChannel') {
   const normalizedValue = `${value}`.trim().toLowerCase();
   if (!ALLOWED_BROWSER_CHANNELS.includes(normalizedValue)) {
-    throw new Error(
-      `Expected one of ${ALLOWED_BROWSER_CHANNELS.join(', ')} for ${flagName}, got "${value}"`,
-    );
+    throw new Error(`Expected one of ${ALLOWED_BROWSER_CHANNELS.join(', ')} for ${flagName}, got "${value}"`);
   }
 
   return normalizedValue;
@@ -85,11 +80,11 @@ export function normalizeFormats(value) {
   }
 
   const items = splitDelimitedValues(Array.isArray(value) ? value : [`${value}`]);
-  const normalized = [...new Set(
-    items
-      .map((item) => `${item}`.trim().toLowerCase())
-      .filter((item) => ALLOWED_OUTPUT_FORMATS.includes(item)),
-  )];
+  const normalized = [
+    ...new Set(
+      items.map((item) => `${item}`.trim().toLowerCase()).filter((item) => ALLOWED_OUTPUT_FORMATS.includes(item)),
+    ),
+  ];
 
   return normalized.length ? normalized : [...defaultConfig.formats];
 }
@@ -101,7 +96,9 @@ function normalizeCities(value) {
 
   const items = Array.isArray(value)
     ? value.map((item) => normalizeWhitespace(String(item))).filter(Boolean)
-    : splitCityInput([`${value}`]).map((item) => normalizeWhitespace(String(item))).filter(Boolean);
+    : splitCityInput([`${value}`])
+        .map((item) => normalizeWhitespace(String(item)))
+        .filter(Boolean);
 
   return [...new Set(items)];
 }
