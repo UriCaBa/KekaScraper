@@ -14,6 +14,14 @@ export const tests = [
     },
   },
   {
+    name: 'pickRandom clamps index when randomFn returns 1',
+    run() {
+      const items = ['a', 'b', 'c'];
+      const result = pickRandom(items, () => 1);
+      assert.equal(result, 'c');
+    },
+  },
+  {
     name: 'pickRandom returns undefined for empty array',
     run() {
       assert.equal(

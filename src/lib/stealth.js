@@ -25,7 +25,8 @@ export function pickRandom(array, randomFn = Math.random) {
     return undefined;
   }
 
-  return array[Math.floor(randomFn() * array.length)];
+  const index = Math.min(Math.floor(randomFn() * array.length), array.length - 1);
+  return array[index];
 }
 
 export function jitter(baseMs, fraction = 0.3, randomFn = Math.random) {
