@@ -55,8 +55,7 @@ body {
   color: var(--ink);
   background:
     radial-gradient(ellipse at top left, rgba(16, 185, 129, 0.07), transparent 40%),
-    radial-gradient(ellipse at bottom right, rgba(16, 185, 129, 0.04), transparent 40%),
-    var(--bg);
+    radial-gradient(ellipse at bottom right, rgba(16, 185, 129, 0.04), transparent 40%), var(--bg);
 }
 
 button,

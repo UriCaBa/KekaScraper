@@ -69,8 +69,8 @@
               <small id="browser-channel-help">Auto tries Edge, then Chrome, then bundled Chromium.</small>
             </label>
 
-            <div class="field checkbox-group">
-              <span>Output formats</span>
+            <div class="field checkbox-group" role="group" aria-labelledby="formats-label">
+              <span id="formats-label">Output formats</span>
               <label><input type="checkbox" name="formats" value="json" /> JSON</label>
               <label><input type="checkbox" name="formats" value="csv" /> CSV</label>
             </div>
@@ -87,9 +87,7 @@
 
             <div class="form-actions field-wide">
               <button id="run-button" type="submit">Start scrape</button>
-              <p class="helper-copy">
-                Results stay on this machine. No external API or cloud backend is involved.
-              </p>
+              <p class="helper-copy">Results stay on this machine. No external API or cloud backend is involved.</p>
             </div>
           </form>
         </section>
