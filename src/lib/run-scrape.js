@@ -111,9 +111,10 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
         const now = Date.now();
         const isLastCity = completedCities.size === totalCities;
         if (isLastCity || now - lastCheckpointTime >= CHECKPOINT_INTERVAL_MS) {
-          await saveCheckpoint(outputDir, runId, completedCities, allResults, normalizedRunConfig);
+          // Update timestamp before the await to prevent overlapping saves under concurrency > 1.
           lastCheckpointTime = now;
           hasUnsavedProgress = false;
+          await saveCheckpoint(outputDir, runId, completedCities, allResults, normalizedRunConfig);
         }
       } catch (error) {
         cityFailures += 1;
@@ -291,7 +292,8 @@ export async function loadCheckpoint(outputDir, expectedCities) {
       }
 
       const resultsValid = data.results.every(
-        (r) => r !== null && typeof r === 'object' && !Array.isArray(r) && typeof r.name === 'string',
+        (r) =>
+          r !== null && typeof r === 'object' && !Array.isArray(r) && (r.name == null || typeof r.name === 'string'),
       );
       if (!resultsValid) {
         console.warn(`[checkpoint] Corrupted results in ${filename}, skipping.`);

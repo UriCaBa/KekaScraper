@@ -1,6 +1,6 @@
 import path from 'node:path';
 import process from 'node:process';
-import { access, readFile, realpath, stat } from 'node:fs/promises';
+import { access, mkdir, readFile, realpath, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { defaultConfig } from '../config.js';
@@ -165,9 +165,12 @@ function registerIpcHandlers() {
       }
     } catch (error) {
       if (error?.code === 'ENOENT') {
-        throw new Error('Output directory does not exist yet. Run a scrape first to create it.', { cause: error });
+        // Directory doesn't exist yet (first launch or no scrape run yet).
+        // Create it so the user can open the folder even before any scrape.
+        await mkdir(dir, { recursive: true });
+      } else {
+        throw error;
       }
-      throw error;
     }
 
     const result = await shell.openPath(dir);
