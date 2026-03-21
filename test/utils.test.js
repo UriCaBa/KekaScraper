@@ -7,8 +7,10 @@ import {
   parseNumber,
   parseRating,
   parseRatingAndReviews,
+  repairMojibake,
   retry,
   stripFieldPrefix,
+  timestampLabel,
   toCsv,
   uniqueNonEmpty,
 } from '../src/lib/utils.js';
@@ -255,6 +257,38 @@ export const tests = [
     run: () => {
       assert.equal(parseRating(''), null);
       assert.equal(parseRating(null), null);
+    },
+  },
+  // --- timestampLabel ---
+  {
+    name: 'timestampLabel returns string matching YYYYMMDD-HHmmss pattern',
+    run: () => {
+      const label = timestampLabel();
+      assert.match(label, /^\d{8}-\d{6}$/);
+    },
+  },
+  {
+    name: 'timestampLabel formats a specific date correctly',
+    run: () => {
+      const date = new Date(2025, 0, 15, 9, 5, 3); // Jan 15 2025 09:05:03
+      assert.equal(timestampLabel(date), '20250115-090503');
+    },
+  },
+  // --- repairMojibake ---
+  {
+    name: 'repairMojibake repairs common UTF-8 mojibake patterns',
+    run: () => {
+      // "Caf\u00e9" encoded as latin1 then decoded as latin1 gives mojibake
+      const mojibake = Buffer.from('Caf\u00e9', 'utf8').toString('latin1');
+      const repaired = repairMojibake(mojibake);
+      assert.equal(repaired, 'Caf\u00e9');
+    },
+  },
+  {
+    name: 'repairMojibake returns input unchanged when no mojibake detected',
+    run: () => {
+      assert.equal(repairMojibake('hello world'), 'hello world');
+      assert.equal(repairMojibake('simple ASCII'), 'simple ASCII');
     },
   },
 ];

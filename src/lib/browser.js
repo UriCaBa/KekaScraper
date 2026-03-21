@@ -82,7 +82,7 @@ export async function launchBrowser(options) {
   }
 }
 
-function getLaunchCandidates(browserChannel, { allowBundledChromium = true } = {}) {
+export function getLaunchCandidates(browserChannel, { allowBundledChromium = true } = {}) {
   if (browserChannel && browserChannel !== 'auto') {
     if (browserChannel === 'chromium' && !allowBundledChromium) {
       return [];
@@ -117,7 +117,7 @@ function makeBundledChromiumCandidate(label = 'bundled Chromium') {
   };
 }
 
-function formatCandidateLabels(candidates) {
+export function formatCandidateLabels(candidates) {
   return candidates.map((candidate) => `"${candidate.label}"`).join(', ');
 }
 
@@ -134,7 +134,7 @@ function formatChannelLabel(channel) {
   }
 }
 
-function describeBundledChromiumDisabledReason({ browserChannel, allowBundledChromium }) {
+export function describeBundledChromiumDisabledReason({ browserChannel, allowBundledChromium }) {
   if (browserChannel !== 'chromium') {
     return 'Use Auto, Microsoft Edge, or Google Chrome instead.';
   }

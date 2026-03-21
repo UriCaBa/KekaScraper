@@ -1,6 +1,14 @@
-import { firstNonEmpty, mapWithConcurrency, parseRatingAndReviews, retry, stripFieldPrefix } from './utils.js';
+import {
+  firstNonEmpty,
+  mapWithConcurrency,
+  parseRatingAndReviews,
+  retry,
+  stripDiacriticsAndLower,
+  stripFieldPrefix,
+} from './utils.js';
 import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
 import { jitteredSleep } from './stealth.js';
+import { isEmptyListing } from '../shared/listing-utils.js';
 
 const LISTING_LINK_SELECTOR = 'a[href*="/maps/place/"], a[href*="/place/"]';
 const STRONG_POSITIVE_HINT_REGEX =
@@ -292,10 +300,11 @@ async function waitForResultsOrDetails(page) {
   });
 }
 
-let consentDismissedForContext = false;
+const consentDismissedByContext = new WeakMap();
 
 async function dismissConsentIfPresent(page) {
-  if (consentDismissedForContext) {
+  const ctx = page.context();
+  if (consentDismissedByContext.get(ctx)) {
     return;
   }
 
@@ -334,7 +343,7 @@ async function dismissConsentIfPresent(page) {
   }
 
   if (dismissed > 0) {
-    consentDismissedForContext = true;
+    consentDismissedByContext.set(ctx, true);
   }
 }
 
@@ -393,27 +402,16 @@ async function collectListingUrls(page, options) {
 }
 
 async function readListingUrls(page) {
+  const extractPlaceUrls = (anchors) =>
+    anchors.map((a) => a.href).filter((href) => typeof href === 'string' && href.includes('/place/'));
+
   const feed = page.locator('[role="feed"], div[aria-label*="Results"]').first();
 
   if (await feed.count()) {
-    return feed
-      .locator(LISTING_LINK_SELECTOR)
-      .evaluateAll((anchors) => {
-        return anchors
-          .map((anchor) => anchor.href)
-          .filter((href) => typeof href === 'string' && href.includes('/place/'));
-      })
-      .catch(() => []);
+    return feed.locator(LISTING_LINK_SELECTOR).evaluateAll(extractPlaceUrls).catch(() => []);
   }
 
-  return page
-    .locator(LISTING_LINK_SELECTOR)
-    .evaluateAll((anchors) => {
-      return anchors
-        .map((anchor) => anchor.href)
-        .filter((href) => typeof href === 'string' && href.includes('/place/'));
-    })
-    .catch(() => []);
+  return page.locator(LISTING_LINK_SELECTOR).evaluateAll(extractPlaceUrls).catch(() => []);
 }
 
 async function scrollResultsPanel(page) {
@@ -577,9 +575,7 @@ export function isLikelyHostel(item) {
   return scoreListingMatch(item).accepted;
 }
 
-export function isEmptyListing(item) {
-  return !item.address && !item.website && !item.phone && !item.category;
-}
+export { isEmptyListing };
 
 export function scoreListingMatch(item) {
   const fields = {
@@ -657,12 +653,7 @@ export function buildSearchQueries(queryPrefix, city) {
 }
 
 function normalizeListingSearchableText(parts) {
-  return parts
-    .filter(Boolean)
-    .join(' ')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
+  return stripDiacriticsAndLower(parts.filter(Boolean).join(' '));
 }
 
 function scoreCityRelevance(fields, positiveSignals, negativeSignals) {

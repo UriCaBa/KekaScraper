@@ -1,12 +1,14 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(currentDir, '..');
+const packageJson = JSON.parse(readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 
 export const defaultConfig = {
-  appVersion: '1.0.0',
+  appVersion: packageJson.version,
   browserChannel: 'auto',
   formats: ['json'],
   headless: true,
@@ -26,10 +28,6 @@ export const defaultConfig = {
   websiteUserAgent: buildDefaultUserAgent(),
   outputDir: path.join(rootDir, 'output'),
 };
-
-export function getRootDir() {
-  return rootDir;
-}
 
 function buildDefaultUserAgent() {
   const platformToken = getPlatformToken();

@@ -52,6 +52,8 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
   });
 
   let cityFailures = 0;
+  let lastCheckpointTime = 0;
+  const CHECKPOINT_INTERVAL_MS = 5000;
   const concurrency = Math.min(normalizedRunConfig.concurrency, remainingCities.length || 1);
   const totalCities = normalizedRunConfig.cities.length;
 
@@ -104,7 +106,12 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
           cityStats: cityCompleted.cityStats,
         });
 
-        await saveCheckpoint(outputDir, runId, completedCities, allResults, normalizedRunConfig);
+        const now = Date.now();
+        const isLastCity = completedCities.size === totalCities;
+        if (isLastCity || now - lastCheckpointTime >= CHECKPOINT_INTERVAL_MS) {
+          await saveCheckpoint(outputDir, runId, completedCities, allResults, normalizedRunConfig);
+          lastCheckpointTime = now;
+        }
       } catch (error) {
         cityFailures += 1;
         emitRunEvent(emit, RUN_EVENT_TYPES.CITY_FAILED, {
@@ -120,6 +127,12 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     });
   } finally {
     await Promise.allSettled([context.close(), browser.close()]);
+  }
+
+  // Always save a final checkpoint after all cities are processed,
+  // regardless of debounce, to capture any cities completed since the last save.
+  if (completedCities.size > 0) {
+    await saveCheckpoint(outputDir, runId, completedCities, allResults, normalizedRunConfig);
   }
 
   let finalResults = allResults;
@@ -271,6 +284,14 @@ export async function loadCheckpoint(outputDir, expectedCities) {
       const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
 
       if (!data.runId || !Array.isArray(data.completedCities) || !Array.isArray(data.results)) {
+        continue;
+      }
+
+      const resultsValid = data.results.every(
+        (r) => r !== null && typeof r === 'object' && !Array.isArray(r) && typeof r.name === 'string',
+      );
+      if (!resultsValid) {
+        console.warn(`[checkpoint] Corrupted results in ${filename}, skipping.`);
         continue;
       }
 

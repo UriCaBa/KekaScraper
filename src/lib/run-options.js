@@ -144,7 +144,18 @@ function normalizeProxy(input) {
     };
   } catch (error) {
     if (error.message.includes('Proxy protocol')) throw error;
-    throw new Error(`Invalid proxy URL: ${raw}`, { cause: error });
+    throw new Error(`Invalid proxy URL: ${sanitizeProxyForLogging(raw)}`, { cause: error });
+  }
+}
+
+function sanitizeProxyForLogging(raw) {
+  try {
+    const url = new URL(raw);
+    url.username = '';
+    url.password = '';
+    return url.toString();
+  } catch {
+    return '<invalid URL>';
   }
 }
 

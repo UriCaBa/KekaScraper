@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { atomicWriteJson } from '../lib/utils.js';
 
 const PREFERENCES_FILENAME = 'preferences.json';
 const BLOCKED_PREFERENCE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -19,19 +20,14 @@ export async function loadPreferences(userDataDir, fallbackState) {
 
 export async function savePreferences(userDataDir, nextState) {
   await fs.mkdir(userDataDir, { recursive: true });
-  const preferencesPath = getPreferencesPath(userDataDir);
-  const tempPath = `${preferencesPath}.tmp`;
-  const serializedState = `${JSON.stringify(nextState, null, 2)}\n`;
-
-  await fs.writeFile(tempPath, serializedState, 'utf8');
-  await fs.rename(tempPath, preferencesPath);
+  await atomicWriteJson(getPreferencesPath(userDataDir), nextState);
 }
 
 function getPreferencesPath(userDataDir) {
   return path.join(userDataDir, PREFERENCES_FILENAME);
 }
 
-function sanitizePreferences(parsedPreferences, fallbackState) {
+export function sanitizePreferences(parsedPreferences, fallbackState) {
   if (!parsedPreferences || typeof parsedPreferences !== 'object' || Array.isArray(parsedPreferences)) {
     return {};
   }

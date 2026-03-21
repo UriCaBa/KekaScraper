@@ -46,7 +46,7 @@
   "build": {
     "appId": "com.oricallabs.kekascraper",
     "productName": "KekaScraper by Orical Labs",
-    "asar": false,
+    "asar": true,
     "extraMetadata": {
       "main": "src/electron/main.js"
     },

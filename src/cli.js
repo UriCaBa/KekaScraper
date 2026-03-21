@@ -4,6 +4,7 @@ import { normalizeBrowserChannel, normalizeInteger, normalizeRunOptions } from '
 import { RUN_EVENT_TYPES } from './lib/run-events.js';
 import { runScrape } from './lib/run-scrape.js';
 import { splitDelimitedValues } from './shared/input-normalization.js';
+import { formatListingSkipReason } from './shared/event-formatting.js';
 import { splitCities } from './lib/utils.js';
 
 async function main() {
@@ -200,17 +201,6 @@ function parseInteger(value, flagName, options = {}) {
 
 function describeEnrichmentTarget(event) {
   return event.name ?? event.website ?? 'listing without website';
-}
-
-function formatListingSkipReason(event) {
-  const scoreText = typeof event.score === 'number' ? `score=${event.score}` : null;
-  const signals = [
-    ...(Array.isArray(event.positiveSignals) ? event.positiveSignals : []),
-    ...(Array.isArray(event.negativeSignals) ? event.negativeSignals : []),
-  ];
-  return [event.reason ?? 'skipped', scoreText, signals.length ? `signals=${signals.join(',')}` : null]
-    .filter(Boolean)
-    .join(' | ');
 }
 
 function printHelp() {

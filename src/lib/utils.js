@@ -1,11 +1,6 @@
 import fs from 'node:fs/promises';
 import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
-import {
-  hasUrlCredentials,
-  isLikelyPublicHostname,
-  normalizePotentialUrl as normalizeSharedPotentialUrl,
-  splitCityInput,
-} from '../shared/input-normalization.js';
+import { normalizePublicUrl, splitCityInput } from '../shared/input-normalization.js';
 
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -227,36 +222,19 @@ export function splitCities(rawValues) {
 }
 
 export function normalizeUrl(value) {
-  if (!value) {
-    return null;
-  }
+  return normalizePublicUrl(value);
+}
 
-  try {
-    const normalizedValue = normalizeSharedPotentialUrl(value);
-    if (!normalizedValue) {
-      return null;
-    }
-
-    const parsed = new URL(normalizedValue);
-    if (
-      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
-      hasUrlCredentials(parsed) ||
-      !isLikelyPublicHostname(parsed.hostname)
-    ) {
-      return null;
-    }
-
-    return parsed.toString();
-  } catch {
-    return null;
-  }
+export function stripDiacriticsAndLower(value) {
+  if (typeof value !== 'string') return '';
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
 export function uniqueNonEmpty(values) {
   return [...new Set(values.map((value) => normalizeWhitespace(String(value))).filter(Boolean))];
 }
 
-function repairMojibake(value) {
+export function repairMojibake(value) {
   if (!/[ÃÂâ€™â€œâ€]/.test(value)) {
     return value;
   }
