@@ -207,6 +207,23 @@ export async function scrapeCity(page, detailPage, options) {
             },
           });
 
+          if (isEmptyListing(item)) {
+            stats.listingsSkipped += 1;
+            emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_SKIPPED, {
+              city,
+              index: candidateIndex,
+              totalListings: seenListingUrls.size,
+              listingUrl,
+              name: item.name ?? null,
+              reason: 'empty-listing',
+              score: 0,
+              positiveSignals: [],
+              negativeSignals: ['no-business-fields'],
+            });
+            await jitteredSleep(detailPauseMs);
+            return;
+          }
+
           const listingMatch = scoreListingMatch(item);
           if (!listingMatch.accepted) {
             stats.listingsSkipped += 1;
@@ -523,6 +540,10 @@ function normalizeMapsUrl(url) {
 
 export function isLikelyHostel(item) {
   return scoreListingMatch(item).accepted;
+}
+
+export function isEmptyListing(item) {
+  return !item.address && !item.website && !item.phone && !item.category;
 }
 
 export function scoreListingMatch(item) {

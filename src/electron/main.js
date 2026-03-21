@@ -1,8 +1,8 @@
 import path from 'node:path';
 import process from 'node:process';
-import { access, mkdir, realpath } from 'node:fs/promises';
+import { access, mkdir, readFile, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { defaultConfig } from '../config.js';
 import { savePreferences, loadPreferences } from './preferences.js';
 import { normalizeBoolean, normalizeBrowserChannel, normalizeFormats, normalizeInteger } from '../lib/run-options.js';
@@ -18,6 +18,7 @@ const isSmokeMode = process.env.KEKA_SMOKE_MODE === '1';
 
 let mainWindow;
 let activeRunPromise = null;
+let userOutputDirectory = null;
 const RESULTS_PREVIEW_LIMIT = 200;
 
 app.whenReady().then(async () => {
@@ -80,12 +81,36 @@ function registerIpcHandlers() {
       await loadPreferences(app.getPath('userData'), getDefaultFormState()),
     );
 
+    if (initialFormState.outputDir) {
+      userOutputDirectory = initialFormState.outputDir;
+    }
+
     return {
       formState: initialFormState,
       outputDirectory: getDesktopOutputDirectory(),
       supportsBundledChromium: !app.isPackaged,
       appVersion: app.getVersion(),
     };
+  });
+
+  ipcMain.handle('app:pick-output-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose output folder',
+      defaultPath: getDesktopOutputDirectory(),
+      properties: ['openDirectory', 'createDirectory'],
+    });
+
+    if (result.canceled || !result.filePaths.length) {
+      return null;
+    }
+
+    const pickedPath = result.filePaths[0];
+    userOutputDirectory = pickedPath;
+
+    const currentPrefs = await loadPreferences(app.getPath('userData'), getDefaultFormState());
+    await savePreferences(app.getPath('userData'), { ...currentPrefs, outputDir: pickedPath });
+
+    return pickedPath;
   });
 
   ipcMain.handle('app:open-external-url', async (_, url) => {
@@ -126,6 +151,45 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle('app:load-results-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Load previous results',
+      defaultPath: getDesktopOutputDirectory(),
+      filters: [{ name: 'JSON files', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+
+    if (result.canceled || !result.filePaths.length) {
+      return null;
+    }
+
+    const filePath = result.filePaths[0];
+    const raw = await readFile(filePath, 'utf8');
+    let parsed;
+
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('The selected file is not valid JSON.');
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new Error('The selected file does not contain a results array.');
+    }
+
+    const items = parsed.filter((item) => item && typeof item === 'object' && !Array.isArray(item));
+    if (items.length === 0) {
+      throw new Error('The selected file contains no valid result entries.');
+    }
+
+    return {
+      filePath,
+      fileName: path.basename(filePath),
+      results: items,
+      totalCount: items.length,
+    };
+  });
+
   ipcMain.handle('scrape:open-output-file', async (_, filePath) => {
     const outputFileCheck = await validateOutputFilePath(filePath);
     if (!outputFileCheck.ok) {
@@ -151,6 +215,7 @@ function getDefaultFormState() {
     concurrency: 1,
     detailConcurrency: 1,
     proxy: '',
+    outputDir: '',
   };
 }
 
@@ -178,6 +243,7 @@ function normalizeStoredFormState(rawFormState = {}) {
       'detailConcurrency',
     ),
     proxy: typeof storedFormState.proxy === 'string' ? storedFormState.proxy.trim() : fallbackState.proxy,
+    outputDir: typeof storedFormState.outputDir === 'string' ? storedFormState.outputDir.trim() : fallbackState.outputDir,
   };
 }
 
@@ -275,7 +341,7 @@ function startDesktopScrape(runConfig) {
 }
 
 function getDesktopOutputDirectory() {
-  return path.join(app.getPath('documents'), 'KekaScraper', 'output');
+  return userOutputDirectory || path.join(app.getPath('documents'), 'KekaScraper', 'output');
 }
 
 function isSafeExternalUrl(value) {

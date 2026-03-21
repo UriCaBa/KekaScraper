@@ -22,4 +22,41 @@ export const tests = [
       assert.equal(fs.existsSync(preloadPath), true);
     },
   },
+  {
+    name: 'electron main registers all expected IPC handlers',
+    run: () => {
+      const mainSource = fs.readFileSync(electronMainPath, 'utf8');
+      const expectedChannels = [
+        'app:get-defaults',
+        'app:pick-output-folder',
+        'app:open-external-url',
+        'app:load-results-file',
+        'scrape:start',
+        'scrape:open-output-folder',
+        'scrape:open-output-file',
+      ];
+      for (const channel of expectedChannels) {
+        assert.match(mainSource, new RegExp(`ipcMain\\.handle\\('${channel}'`), `missing IPC handler: ${channel}`);
+      }
+    },
+  },
+  {
+    name: 'electron preload exposes all expected bridge methods',
+    run: () => {
+      const preloadSource = fs.readFileSync(preloadPath, 'utf8');
+      const expectedMethods = [
+        'getDefaults',
+        'startScrape',
+        'openOutputFolder',
+        'openOutputFile',
+        'openExternalUrl',
+        'loadResultsFile',
+        'pickOutputFolder',
+        'onScrapeEvent',
+      ];
+      for (const method of expectedMethods) {
+        assert.match(preloadSource, new RegExp(`${method}\\s*:`), `missing bridge method: ${method}`);
+      }
+    },
+  },
 ];

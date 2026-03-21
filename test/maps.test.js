@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 
-import { buildSearchQueries, isLikelyHostel, MAX_DETAIL_CONCURRENCY, scoreListingMatch } from '../src/lib/maps.js';
+import {
+  buildSearchQueries,
+  isEmptyListing,
+  isLikelyHostel,
+  MAX_DETAIL_CONCURRENCY,
+  scoreListingMatch,
+} from '../src/lib/maps.js';
 
 export const tests = [
   {
@@ -81,6 +87,40 @@ export const tests = [
       });
       assert.equal(wrongCityWithoutAddress.accepted, false);
       assert.match(wrongCityWithoutAddress.negativeSignals.join(' '), /location-strong-negative-other-city/);
+    },
+  },
+  {
+    name: 'isEmptyListing rejects listings with no business fields',
+    run: () => {
+      assert.equal(
+        isEmptyListing({ name: 'Terrassa Terrassa', address: null, website: null, phone: null, category: null }),
+        true,
+        'listing with only a name and no business fields is empty',
+      );
+
+      assert.equal(
+        isEmptyListing({ name: 'Hostal Terrassa', address: 'Carrer Major 1', website: null, phone: null, category: null }),
+        false,
+        'listing with an address is not empty',
+      );
+
+      assert.equal(
+        isEmptyListing({ name: 'Hostal Terrassa', address: null, website: 'https://hostal.com', phone: null, category: null }),
+        false,
+        'listing with a website is not empty',
+      );
+
+      assert.equal(
+        isEmptyListing({ name: 'Hostal Terrassa', address: null, website: null, phone: '+34 937 000 000', category: null }),
+        false,
+        'listing with a phone is not empty',
+      );
+
+      assert.equal(
+        isEmptyListing({ name: 'Hostal Terrassa', address: null, website: null, phone: null, category: 'Hostel' }),
+        false,
+        'listing with a category is not empty',
+      );
     },
   },
   {
