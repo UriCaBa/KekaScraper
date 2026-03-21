@@ -139,6 +139,8 @@ try {
         openOutputFolder: async () => {},
         openOutputFile: async () => {},
         openExternalUrl: async () => {},
+        loadResultsFile: async () => null,
+        pickOutputFolder: async () => null,
         onScrapeEvent: (handler) => {
           listeners.add(handler);
           return () => listeners.delete(handler);
@@ -158,17 +160,17 @@ try {
 
   await page.locator('#run-button').click();
   await page.waitForFunction(() => document.querySelector('#status-phase')?.textContent === 'Completed');
-  await page.waitForFunction(() => document.querySelector('#results-summary')?.textContent?.includes('2 rows'));
+  await page.waitForFunction(() => document.querySelector('#dash-count')?.textContent?.includes('2 hostel'));
   await page.waitForFunction(() => document.querySelector('#run-button')?.textContent === 'Start scrape');
 
   const submittedPayload = await page.evaluate(() => window.__KEKA_SMOKE_START_PAYLOAD);
   const activityLog = await page.locator('#activity-log').textContent();
-  const resultsSummary = await page.locator('#results-summary').textContent();
+  const dashCount = await page.locator('#dash-count').textContent();
 
   assert(submittedPayload && typeof submittedPayload === 'object', 'Expected a submitted payload');
   assert(!Object.hasOwn(submittedPayload, 'websitePageLimit'), 'Renderer should not submit websitePageLimit anymore');
   assert(activityLog.includes('Run success.'), 'Expected the completion log to be rendered');
-  assert(resultsSummary.includes('2 rows'), `Expected "2 rows" in results summary, got "${resultsSummary}"`);
+  assert(dashCount.includes('2 hostel'), `Expected "2 hostel" in dashboard count, got "${dashCount}"`);
 
   const unexpectedConsoleMessages = consoleMessages.filter(
     (message) => !message.includes("Content Security Policy directive 'frame-ancestors' is ignored"),

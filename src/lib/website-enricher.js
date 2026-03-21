@@ -311,7 +311,7 @@ async function fetchHtmlPage(url, options) {
       lines,
       hasForm: /<form\b/i.test(html),
       anchors: extractAnchors(html, response.url),
-      emails: extractEmails(html),
+      emails: mergeEmailSources(extractEmails(html), extractEmails(lines.join(' ')), extractMailtoEmails(html)),
       phones: extractPhones(lines.join(' ')),
     };
   } finally {
@@ -386,7 +386,7 @@ function extractAnchors(html, baseUrl) {
   return anchors;
 }
 
-export { extractSocialLinks, extractAnchors };
+export { extractSocialLinks, extractAnchors, extractMailtoEmails };
 
 const SOCIAL_PATTERNS = [
   { key: 'instagramUrl', pattern: /^https?:\/\/(www\.)?instagram\.com\/[^/?#]+/i },
@@ -451,10 +451,11 @@ function htmlToLines(html) {
 
 function decodeHtmlEntities(value) {
   return value
+    .replace(/&#x([0-9a-f]{1,4});/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/&#(\d{1,5});/g, (_, dec) => String.fromCharCode(Number.parseInt(dec, 10)))
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
     .replace(/&apos;/gi, "'")
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>');
@@ -464,8 +465,18 @@ function stripTags(value) {
   return value.replace(/<[^>]+>/g, ' ');
 }
 
+function mergeEmailSources(...emailArrays) {
+  return uniqueNonEmpty(emailArrays.flat());
+}
+
+function extractMailtoEmails(html) {
+  const decoded = decodeHtmlEntities(decodeEscapedUnicode(html));
+  const matches = decoded.match(/mailto:([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi) ?? [];
+  return matches.map((match) => match.replace(/^mailto:/i, ''));
+}
+
 export function extractEmails(value) {
-  const normalizedValue = decodeEscapedUnicode(value);
+  const normalizedValue = decodeHtmlEntities(decodeEscapedUnicode(value));
   const matches = normalizedValue.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
   return uniqueNonEmpty(
     matches.filter((email) => {
@@ -674,9 +685,11 @@ function buildEmailCandidates(scannedPages, websiteDomain, listing) {
     .map((entry) => rankEmailCandidate(entry.email, [...entry.sourceUrls], websiteDomain, listing))
     .sort((left, right) => right.score - left.score || left.email.length - right.email.length);
 
+  const forceRecommend = ranked.length === 1;
+
   return ranked.map((candidate, index) => ({
     ...candidate,
-    recommended: index === 0,
+    recommended: index === 0 || forceRecommend,
   }));
 }
 

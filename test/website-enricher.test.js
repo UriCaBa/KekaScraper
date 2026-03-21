@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   getEnrichmentCacheKey,
   extractEmails,
+  extractMailtoEmails,
   extractSocialLinks,
   extractAnchors,
 } from '../src/lib/website-enricher.js';
@@ -127,6 +128,80 @@ export const tests = [
       const result = extractSocialLinks(anchors);
       // Pattern match captures only the base path (up to first ?, #, or /)
       assert.equal(result.instagramUrl, 'https://www.instagram.com/myhostel');
+    },
+  },
+  {
+    name: 'extractEmails finds emails in cleaned text that raw HTML might miss',
+    run: () => {
+      // Email split across HTML tags — raw HTML regex won't match, but cleaned text will
+      const cleanedText = 'Contact us at info@hostel-terrassa.com for bookings';
+      assert.deepEqual(extractEmails(cleanedText), ['info@hostel-terrassa.com']);
+
+      // Email alongside phone in same text
+      const mixedText = 'Phone: +34 937 123 456 Email: booking@myhostel.es';
+      const emails = extractEmails(mixedText);
+      assert.ok(emails.includes('booking@myhostel.es'));
+    },
+  },
+  {
+    name: 'extractEmails handles HTML entities in email addresses',
+    run: () => {
+      // Emails with unicode escapes
+      const unicodeText = 'hello\\u0040hostel.com';
+      assert.deepEqual(extractEmails(unicodeText), ['hello@hostel.com']);
+    },
+  },
+  {
+    name: 'extractEmails decodes numeric HTML entities used to obfuscate emails',
+    run: () => {
+      // &#64; = @, &#46; = .  (decimal entities — very common anti-spam technique)
+      assert.deepEqual(extractEmails('info&#64;hostel&#46;com'), ['info@hostel.com']);
+
+      // &#x40; = @, &#x2e; = .  (hex entities)
+      assert.deepEqual(extractEmails('booking&#x40;myhostel&#x2e;es'), ['booking@myhostel.es']);
+
+      // Mixed: some entities, some plain
+      assert.deepEqual(extractEmails('contact&#64;example.com and hello@plain.com'), [
+        'contact@example.com',
+        'hello@plain.com',
+      ]);
+    },
+  },
+  {
+    name: 'extractEmails finds emails inside mailto href attributes',
+    run: () => {
+      const html = '<a href="mailto:info&#64;hostel.com">Contact</a> and <a href="mailto:book@test.es">Book</a>';
+      const emails = extractEmails(html);
+      assert.ok(emails.includes('info@hostel.com'), 'should decode &#64; in mailto href');
+      assert.ok(emails.includes('book@test.es'), 'should find plain mailto');
+    },
+  },
+  {
+    name: 'extractMailtoEmails extracts and decodes emails from mailto hrefs',
+    run: () => {
+      const html = '<a href="mailto:info@hostel.com">Email</a> <a href="mailto:book&#64;test.es">Book</a>';
+      const emails = extractMailtoEmails(html);
+      assert.ok(emails.includes('info@hostel.com'), 'should extract plain mailto');
+      assert.ok(emails.includes('book@test.es'), 'should decode &#64; in mailto');
+    },
+  },
+  {
+    name: 'extractMailtoEmails returns empty array when no mailto links exist',
+    run: () => {
+      assert.deepEqual(extractMailtoEmails('<a href="https://example.com">Link</a>'), []);
+      assert.deepEqual(extractMailtoEmails('no links here'), []);
+    },
+  },
+  {
+    name: 'extractEmails deduplicates when same email found in html and text',
+    run: () => {
+      // Simulates mergeEmailSources behavior: same email from raw HTML + cleaned text
+      const raw = '<a href="mailto:info@hostel.com">info@hostel.com</a>';
+      const text = 'Contact: info@hostel.com';
+      const combined = [...extractEmails(raw), ...extractEmails(text)];
+      const unique = [...new Set(combined)];
+      assert.equal(unique.length, 1, 'should deduplicate same email from different sources');
+      assert.equal(unique[0], 'info@hostel.com');
     },
   },
 ];

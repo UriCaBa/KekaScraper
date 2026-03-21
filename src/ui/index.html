@@ -24,16 +24,28 @@
         <div class="hero-meta">
           <div class="meta-card">
             <span class="meta-label">Output folder</span>
-            <strong id="output-directory">Loading...</strong>
+            <div class="output-dir-row">
+              <strong id="output-directory">Loading...</strong>
+              <button id="pick-output-folder" type="button" class="secondary output-dir-change">Change</button>
+            </div>
           </div>
           <div class="meta-card">
             <span class="meta-label">App version</span>
             <strong id="app-version">-</strong>
           </div>
+          <button id="open-help" type="button" class="secondary help-text-button" aria-label="How it works">
+            How it works
+          </button>
         </div>
       </header>
 
-      <main class="layout">
+      <nav class="tab-nav" role="tablist">
+        <button class="tab-button active" role="tab" aria-selected="true" data-tab="scrape">Scrape</button>
+        <button class="tab-button" role="tab" aria-selected="false" data-tab="dashboard">Dashboard</button>
+      </nav>
+
+      <!-- Tab 1: Scrape -->
+      <main id="tab-scrape" class="tab-content layout" role="tabpanel">
         <section class="panel form-panel">
           <div class="panel-header">
             <h2>Run a scrape</h2>
@@ -55,7 +67,8 @@
 
             <label class="field">
               <span>Max results per city</span>
-              <input id="result-limit" name="resultLimit" type="number" min="1" step="1" />
+              <input id="result-limit" name="resultLimit" type="number" min="1" max="100" step="1" />
+              <small>Recommended 20-50. Above 50 is slower and may trigger rate limits without a proxy.</small>
             </label>
 
             <label class="field">
@@ -83,27 +96,28 @@
             <label class="field field-wide checkbox-line">
               <input id="enrich-website" name="enrichWebsite" type="checkbox" />
               <span>Enrich results from each hostel website automatically</span>
+              <small>Adds emails, phones, social media, and decision makers. Adds ~5-10s per hostel.</small>
             </label>
 
-            <details class="field-wide advanced-section">
+            <details class="field-wide advanced-section" open>
               <summary>Advanced options</summary>
               <div class="advanced-grid">
                 <label class="field">
                   <span>Parallel cities</span>
                   <input id="concurrency" name="concurrency" type="number" min="1" max="5" step="1" />
-                  <small>Process N cities simultaneously (default 1)</small>
+                  <small>Recommended 1-3. Higher values need more RAM (~500MB per city). Max 5.</small>
                 </label>
 
                 <label class="field">
                   <span>Parallel listings</span>
                   <input id="detail-concurrency" name="detailConcurrency" type="number" min="1" max="3" step="1" />
-                  <small>Extract N listings at once within a city (default 1, max 3)</small>
+                  <small>Recommended 1-2. 3 is faster but increases rate-limit risk. Max 3.</small>
                 </label>
 
                 <label class="field">
                   <span>Proxy</span>
                   <input id="proxy" name="proxy" type="text" placeholder="http://user:pass@host:port" />
-                  <small>Optional HTTP/SOCKS5 proxy for all traffic</small>
+                  <small>Recommended for 50+ results per city. HTTP or SOCKS5 format.</small>
                 </label>
               </div>
             </details>
@@ -144,41 +158,206 @@
             <ul id="activity-log" class="activity-log"></ul>
           </div>
         </section>
+      </main>
 
-        <section class="panel results-panel">
-          <div class="panel-header">
-            <h2>Results</h2>
-            <p>Preview the latest run and open the exported files.</p>
+      <!-- Tab 2: Dashboard -->
+      <div id="tab-dashboard" class="tab-content" role="tabpanel" hidden>
+        <div class="dash-toolbar">
+          <div class="dash-toolbar-left">
+            <button id="dash-load-json" type="button" class="secondary">Load JSON</button>
+            <span id="dash-file-label" class="dash-file-label"></span>
           </div>
-
-          <div id="results-empty" class="empty-state">
-            No results yet. Run a scrape to preview the exported lead list here.
+          <div class="dash-toolbar-right">
+            <input id="dash-search" type="text" class="dash-search" placeholder="Search name, city, email..." />
+            <span id="dash-count" class="dash-count">0 hostels</span>
           </div>
+        </div>
 
-          <div id="results-content" class="results-content" hidden>
-            <div class="results-toolbar">
-              <span id="results-summary">0 rows</span>
-              <div id="output-files" class="file-list"></div>
-            </div>
-            <div class="table-wrap">
-              <table>
+        <div id="dash-stats" class="dash-stats">
+          <div class="stat-chip">
+            <div class="stat-top"><strong id="stat-total">0</strong><span>Total</span></div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-top"><strong id="stat-with-email">0</strong><span>With email</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-email"></div></div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-top"><strong id="stat-with-phone">0</strong><span>With phone</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-phone"></div></div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-top"><strong id="stat-with-dm">0</strong><span>Decision maker</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-dm"></div></div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-top"><strong id="stat-enriched">0</strong><span>Enriched</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-enriched"></div></div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-top"><strong id="stat-with-social">0</strong><span>Social</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-social"></div></div>
+          </div>
+        </div>
+
+        <div id="dash-empty" class="empty-state">
+          No data loaded. Run a scrape or load a previous JSON export to view results here.
+        </div>
+
+        <div id="dash-content" class="dash-content" hidden>
+          <div class="dash-hint" id="dash-hint">Click any row to see full details</div>
+          <div class="dash-master">
+            <div class="dash-table-wrap">
+              <table class="dash-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
+                    <th class="col-name">Name</th>
                     <th>City</th>
-                    <th>Website</th>
-                    <th>General email</th>
-                    <th>Best channel</th>
-                    <th>Best value</th>
+                    <th>Data</th>
+                    <th>Email</th>
+                    <th>Channel</th>
+                    <th>Phone</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
-                <tbody id="results-table-body"></tbody>
+                <tbody id="dash-table-body"></tbody>
               </table>
             </div>
+            <div class="dash-table-footer">
+              <span id="dash-footer-count"></span>
+            </div>
           </div>
-        </section>
-      </main>
+        </div>
+
+        <div id="dash-detail-container" class="dash-detail-container" hidden>
+          <div class="detail-bar">
+            <h3 id="detail-name"></h3>
+            <span id="detail-subtitle" class="detail-subtitle"></span>
+            <button id="detail-close" type="button" class="secondary detail-bar-close">Back to table</button>
+          </div>
+          <div class="detail-body">
+            <div class="detail-section">
+              <h4>Contact</h4>
+              <div class="detail-grid" id="detail-contact"></div>
+            </div>
+            <div class="detail-section">
+              <h4>Decision Maker</h4>
+              <div class="detail-grid" id="detail-dm"></div>
+            </div>
+            <div class="detail-section">
+              <h4>Social Media</h4>
+              <div class="detail-grid" id="detail-social"></div>
+            </div>
+            <div class="detail-section">
+              <h4>Basic Info</h4>
+              <div class="detail-grid" id="detail-basic"></div>
+            </div>
+            <div class="detail-section">
+              <h4>Enrichment</h4>
+              <div class="detail-grid" id="detail-enrichment"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <dialog id="help-dialog" class="help-dialog">
+      <div class="help-dialog-content">
+        <div class="help-dialog-header">
+          <h2>How to use KekaScraper</h2>
+          <button id="close-help" type="button" class="secondary" aria-label="Close help">&times;</button>
+        </div>
+        <div class="help-dialog-body">
+          <section>
+            <h3>What it does</h3>
+            <p>
+              KekaScraper searches Google Maps for hostels in the cities you specify, extracts their public details
+              (name, address, phone, website, rating), and optionally enriches results by scanning each hostel's website
+              for contact information like email addresses, booking pages, and social media profiles.
+            </p>
+          </section>
+
+          <section>
+            <h3>Getting started</h3>
+            <ol>
+              <li>Enter one or more cities (one per line, or separated by semicolons).</li>
+              <li>Set the maximum results per city (default: 20).</li>
+              <li>Choose your output format: JSON, CSV, or both.</li>
+              <li>Click <strong>Start scrape</strong> and watch the activity log for progress.</li>
+            </ol>
+          </section>
+
+          <section>
+            <h3>Options explained</h3>
+            <dl>
+              <dt>Browser</dt>
+              <dd>
+                Which Chromium-based browser to use for scraping. "Auto" tries Edge first, then Chrome, then bundled
+                Chromium (dev builds only).
+              </dd>
+
+              <dt>Show the browser while scraping</dt>
+              <dd>
+                Opens a visible browser window so you can watch the scraping process in real time. Useful for debugging
+                or verifying that the scrape is progressing correctly.
+              </dd>
+
+              <dt>Enrich results from each hostel website</dt>
+              <dd>
+                After collecting listings from Google Maps, visits each hostel's website to find email addresses,
+                contact forms, decision-maker details, social media links, and room/bed counts. This adds significant
+                detail but makes the run slower.
+              </dd>
+
+              <dt>Parallel cities</dt>
+              <dd>
+                Process multiple cities simultaneously (1 to 5). Higher values finish faster but use more memory and
+                CPU. Start with 1 if unsure.
+              </dd>
+
+              <dt>Parallel listings</dt>
+              <dd>
+                Extract multiple listings at once within a single city (1 to 3). Keep this low to reduce the chance of
+                being rate-limited by Google Maps.
+              </dd>
+
+              <dt>Proxy</dt>
+              <dd>
+                Route all browser traffic through an HTTP or SOCKS5 proxy server. Format:
+                <code>http://user:pass@host:port</code> or <code>socks5://host:port</code>.
+              </dd>
+            </dl>
+          </section>
+
+          <section>
+            <h3>Output formats</h3>
+            <p>
+              <strong>JSON</strong> &mdash; Machine-readable format, ideal for further processing, importing into
+              databases, or feeding into other tools.
+            </p>
+            <p>
+              <strong>CSV</strong> &mdash; Spreadsheet-compatible format that opens directly in Excel, Google Sheets, or
+              Numbers. One row per hostel.
+            </p>
+            <p>
+              Files are saved to the output folder shown in the header. You can open it directly from the status panel.
+            </p>
+          </section>
+
+          <section>
+            <h3>Tips</h3>
+            <ul>
+              <li>Start with a small run (1 city, 5&ndash;10 results) to verify everything works before scaling up.</li>
+              <li>
+                If a scrape is interrupted, re-running the same cities will resume from the last checkpoint
+                automatically.
+              </li>
+              <li>All results stay on your machine. No data is sent to any external service or cloud backend.</li>
+              <li>The dashboard shows a live preview. Use the exported file or Load JSON for the full dataset.</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </dialog>
 
     <script type="module" src="./app.js"></script>
   </body>

@@ -2,7 +2,6 @@ import { RUN_EVENT_TYPES } from '../lib/run-events.js';
 import { countUniqueCities, normalizePublicUrl } from '../shared/input-normalization.js';
 import {
   buildCompletionMessage as formatCompletionMessage,
-  deriveResultsView,
   deriveRunButtonView,
   deriveStatusView,
   formatDuration as formatRunDuration,
@@ -21,9 +20,15 @@ const state = {
   results: [],
   outputFiles: [],
   lastCompletedSummary: null,
+  activeTab: 'scrape',
+  dashResults: [],
+  dashSelectedIndex: -1,
+  dashSearchQuery: '',
+  dashFileName: '',
 };
 
 const RESULTS_PREVIEW_LIMIT = 200;
+const DASH_ROW_LIMIT = 500;
 
 const elements = {
   form: document.querySelector('#scrape-form'),
@@ -43,14 +48,39 @@ const elements = {
   statusResults: document.querySelector('#status-results'),
   statusCities: document.querySelector('#status-cities'),
   activityLog: document.querySelector('#activity-log'),
-  resultsEmpty: document.querySelector('#results-empty'),
-  resultsContent: document.querySelector('#results-content'),
-  resultsSummary: document.querySelector('#results-summary'),
-  resultsTableBody: document.querySelector('#results-table-body'),
-  outputFiles: document.querySelector('#output-files'),
   concurrency: document.querySelector('#concurrency'),
   detailConcurrency: document.querySelector('#detail-concurrency'),
   proxy: document.querySelector('#proxy'),
+  pickOutputFolderButton: document.querySelector('#pick-output-folder'),
+  openHelpButton: document.querySelector('#open-help'),
+  closeHelpButton: document.querySelector('#close-help'),
+  helpDialog: document.querySelector('#help-dialog'),
+  tabButtons: [...document.querySelectorAll('.tab-button')],
+  tabScrape: document.querySelector('#tab-scrape'),
+  tabDashboard: document.querySelector('#tab-dashboard'),
+  dashLoadJson: document.querySelector('#dash-load-json'),
+  dashFileLabel: document.querySelector('#dash-file-label'),
+  dashSearch: document.querySelector('#dash-search'),
+  dashCount: document.querySelector('#dash-count'),
+  dashEmpty: document.querySelector('#dash-empty'),
+  dashContent: document.querySelector('#dash-content'),
+  dashTableBody: document.querySelector('#dash-table-body'),
+  dashHint: document.querySelector('#dash-hint'),
+  dashDetailContainer: document.querySelector('#dash-detail-container'),
+  detailName: document.querySelector('#detail-name'),
+  detailSubtitle: document.querySelector('#detail-subtitle'),
+  detailClose: document.querySelector('#detail-close'),
+  detailBasic: document.querySelector('#detail-basic'),
+  detailContact: document.querySelector('#detail-contact'),
+  detailDm: document.querySelector('#detail-dm'),
+  detailSocial: document.querySelector('#detail-social'),
+  detailEnrichment: document.querySelector('#detail-enrichment'),
+  statTotal: document.querySelector('#stat-total'),
+  statWithEmail: document.querySelector('#stat-with-email'),
+  statWithPhone: document.querySelector('#stat-with-phone'),
+  statWithDm: document.querySelector('#stat-with-dm'),
+  statEnriched: document.querySelector('#stat-enriched'),
+  statWithSocial: document.querySelector('#stat-with-social'),
 };
 
 elements.runButton.disabled = true;
@@ -102,6 +132,59 @@ async function bootstrap() {
     }
   });
 
+  elements.pickOutputFolderButton.addEventListener('click', () => {
+    return runUiAction(async () => {
+      const pickedPath = await bridge.pickOutputFolder();
+      if (pickedPath) {
+        state.outputDirectory = pickedPath;
+        elements.outputDirectory.textContent = pickedPath;
+      }
+    }, 'Failed to pick an output folder');
+  });
+
+  elements.openHelpButton.addEventListener('click', () => {
+    elements.helpDialog.showModal();
+  });
+
+  elements.closeHelpButton.addEventListener('click', () => {
+    elements.helpDialog.close();
+  });
+
+  elements.helpDialog.addEventListener('click', (event) => {
+    if (event.target === elements.helpDialog) {
+      elements.helpDialog.close();
+    }
+  });
+
+  // Tab navigation
+  for (const button of elements.tabButtons) {
+    button.addEventListener('click', () => {
+      switchTab(button.dataset.tab);
+    });
+  }
+
+  // Dashboard: load JSON
+  elements.dashLoadJson.addEventListener('click', async () => {
+    await runUiAction(handleLoadResults, 'Failed to load results file');
+  });
+
+  // Dashboard: search
+  elements.dashSearch.addEventListener('input', () => {
+    state.dashSearchQuery = elements.dashSearch.value.trim().toLowerCase();
+    renderDashTable();
+  });
+
+  // Dashboard: back to table from detail view
+  elements.detailClose.addEventListener('click', () => {
+    closeDashDetail();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !elements.dashDetailContainer.hidden) {
+      closeDashDetail();
+    }
+  });
+
   bridge.onScrapeEvent((event) => {
     handleScrapeEvent(event);
   });
@@ -111,6 +194,23 @@ async function bootstrap() {
   setFormDisabled(false);
   renderStatus();
 }
+
+// ── Tab switching ──
+
+function switchTab(tabName) {
+  state.activeTab = tabName;
+
+  for (const button of elements.tabButtons) {
+    const isActive = button.dataset.tab === tabName;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-selected', String(isActive));
+  }
+
+  elements.tabScrape.hidden = tabName !== 'scrape';
+  elements.tabDashboard.hidden = tabName !== 'dashboard';
+}
+
+// ── Scrape logic (unchanged) ──
 
 async function handleSubmit() {
   let payload;
@@ -149,6 +249,13 @@ async function handleSubmit() {
     state.totalCities = result.summary.totalCities;
     elements.outputDirectory.textContent = result.summary.outputDirectory;
     appendLog(formatCompletionMessage(result.summary));
+
+    // Push results to dashboard and auto-switch (filter phantom listings)
+    state.dashResults = state.results.filter((item) => !isPhantomListing(item));
+    state.dashSelectedIndex = -1;
+    state.dashFileName = '';
+    renderDashboard();
+    switchTab('dashboard');
   } catch (error) {
     appendLog(error.message, 'error');
     elements.statusCopy.textContent = error.message;
@@ -275,23 +382,7 @@ function renderStatus() {
 }
 
 function renderResults() {
-  const resultsView = deriveResultsView({
-    lastCompletedSummary: state.lastCompletedSummary,
-    results: state.results,
-  });
-  elements.resultsEmpty.hidden = resultsView.resultsEmptyHidden;
-  elements.resultsContent.hidden = resultsView.resultsContentHidden;
-
-  if (!resultsView.hasCompletedRun) {
-    elements.resultsTableBody.replaceChildren();
-    elements.outputFiles.replaceChildren();
-    elements.resultsSummary.textContent = resultsView.resultsSummary;
-    return;
-  }
-
-  elements.resultsSummary.textContent = resultsView.resultsSummary;
-  renderResultRows();
-  renderOutputFiles();
+  // Results are now shown in the Dashboard tab — this is a no-op for backward compat.
 }
 
 function populateForm(formState) {
@@ -373,6 +464,8 @@ function setFormDisabled(disabled) {
     element.disabled = disabled;
   }
 
+  elements.dashLoadJson.disabled = disabled;
+  elements.pickOutputFolderButton.disabled = disabled;
   renderRunButton();
   syncFormatSelection();
 }
@@ -417,25 +510,6 @@ function syncFormatSelection() {
   }
 }
 
-function renderResultRows() {
-  const fragment = document.createDocumentFragment();
-
-  for (const item of state.results) {
-    const row = document.createElement('tr');
-    row.append(
-      createTextCell(item.name),
-      createTextCell(item.searchedCity),
-      createWebsiteCell(item.website),
-      createTextCell(item.generalEmail),
-      createTextCell(item.bestContactChannel),
-      createTextCell(item.bestContactValue),
-    );
-    fragment.append(row);
-  }
-
-  elements.resultsTableBody.replaceChildren(fragment);
-}
-
 function renderActivityLog() {
   const fragment = document.createDocumentFragment();
 
@@ -447,48 +521,6 @@ function renderActivityLog() {
   }
 
   elements.activityLog.replaceChildren(fragment);
-}
-
-function renderOutputFiles() {
-  const fragment = document.createDocumentFragment();
-
-  for (const filePath of state.outputFiles) {
-    const fileName = filePath.split(/[\\/]/).pop() ?? filePath;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'secondary output-file';
-    button.textContent = fileName;
-    button.addEventListener('click', async () => {
-      await runUiAction(() => getBridge().openOutputFile(filePath), `Failed to open ${fileName}`);
-    });
-    fragment.append(button);
-  }
-
-  elements.outputFiles.replaceChildren(fragment);
-}
-
-function createTextCell(value) {
-  const cell = document.createElement('td');
-  cell.textContent = `${value ?? ''}`;
-  return cell;
-}
-
-function createWebsiteCell(url) {
-  const cell = document.createElement('td');
-  const safeUrl = sanitizeExternalUrl(url);
-  if (!safeUrl) {
-    return cell;
-  }
-
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'secondary external-link';
-  button.textContent = safeUrl;
-  button.addEventListener('click', async () => {
-    await runUiAction(() => getBridge().openExternalUrl(safeUrl), `Failed to open ${safeUrl}`);
-  });
-  cell.append(button);
-  return cell;
 }
 
 function renderRunButton() {
@@ -514,6 +546,8 @@ function getBridge() {
     'openOutputFile',
     'openExternalUrl',
     'onScrapeEvent',
+    'loadResultsFile',
+    'pickOutputFolder',
   ]) {
     if (typeof bridge[methodName] !== 'function') {
       throw new Error(`Desktop bridge missing "${methodName}". Reload the app.`);
@@ -532,4 +566,348 @@ function formatListingSkipReason(event) {
   return [event.reason ?? 'skipped', scoreText, signals.length ? `signals=${signals.join(',')}` : null]
     .filter(Boolean)
     .join(' | ');
+}
+
+// ── Dashboard ──
+
+function closeDashDetail() {
+  state.dashSelectedIndex = -1;
+  elements.dashDetailContainer.hidden = true;
+  elements.dashContent.hidden = false;
+}
+
+function isPhantomListing(item) {
+  return !item.address && !item.website && !item.phone && !item.category;
+}
+
+async function handleLoadResults() {
+  const data = await getBridge().loadResultsFile();
+  if (!data) {
+    return;
+  }
+
+  const filtered = data.results.filter((item) => !isPhantomListing(item));
+  state.dashResults = filtered.slice(0, DASH_ROW_LIMIT);
+  if (filtered.length > DASH_ROW_LIMIT) {
+    appendLog(
+      `Dashboard shows first ${DASH_ROW_LIMIT} of ${filtered.length} results. Open the exported file for the full dataset.`,
+    );
+    renderStatus();
+  }
+  state.dashSelectedIndex = -1;
+  state.dashFileName = data.fileName;
+  state.dashSearchQuery = '';
+  elements.dashSearch.value = '';
+  elements.dashDetailContainer.hidden = true;
+  renderDashboard();
+}
+
+function getFilteredDashResults() {
+  if (!state.dashSearchQuery) {
+    return state.dashResults;
+  }
+
+  const query = state.dashSearchQuery;
+  return state.dashResults.filter((item) => {
+    const haystack = [item.name, item.searchedCity, item.generalEmail, item.bestContactValue, item.website]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(query);
+  });
+}
+
+function computeStats(results) {
+  const total = results.length;
+  const withEmail = results.filter((r) => r.generalEmail).length;
+  const withPhone = results.filter((r) => r.phone || r.websitePhone).length;
+  const withDm = results.filter((r) => r.decisionMakerName).length;
+  const enriched = results.filter((r) => r.websiteScanStatus === 'ok').length;
+  const withSocial = results.filter((r) => r.instagramUrl || r.facebookUrl || r.linkedinUrl || r.twitterUrl).length;
+  return { total, withEmail, withPhone, withDm, enriched, withSocial };
+}
+
+function renderDashboard() {
+  const allResults = state.dashResults;
+  const hasData = allResults.length > 0;
+
+  elements.dashEmpty.hidden = hasData;
+  elements.dashContent.hidden = !hasData;
+  elements.dashFileLabel.textContent = state.dashFileName ? state.dashFileName : '';
+
+  const stats = computeStats(allResults);
+  const total = stats.total || 1;
+  elements.statTotal.textContent = `${stats.total}`;
+  elements.statWithEmail.textContent = `${stats.withEmail}`;
+  elements.statWithPhone.textContent = `${stats.withPhone}`;
+  elements.statWithDm.textContent = `${stats.withDm}`;
+  elements.statEnriched.textContent = `${stats.enriched}`;
+  elements.statWithSocial.textContent = `${stats.withSocial}`;
+
+  setStatBar('stat-bar-email', stats.withEmail, total);
+  setStatBar('stat-bar-phone', stats.withPhone, total);
+  setStatBar('stat-bar-dm', stats.withDm, total);
+  setStatBar('stat-bar-enriched', stats.enriched, total);
+  setStatBar('stat-bar-social', stats.withSocial, total);
+
+  renderDashTable();
+}
+
+function setStatBar(id, count, total) {
+  const bar = document.querySelector(`#${id}`);
+  if (bar) {
+    bar.style.width = `${Math.round((count / total) * 100)}%`;
+  }
+}
+
+function renderDashTable() {
+  const filtered = getFilteredDashResults();
+  elements.dashCount.textContent = `${filtered.length} hostel${filtered.length === 1 ? '' : 's'}`;
+
+  const footerCount = document.querySelector('#dash-footer-count');
+  if (footerCount) {
+    footerCount.textContent = `Showing ${filtered.length} of ${state.dashResults.length} results`;
+  }
+
+  const indexByItem = new Map();
+  state.dashResults.forEach((dashItem, index) => {
+    indexByItem.set(dashItem, index);
+  });
+
+  const fragment = document.createDocumentFragment();
+
+  for (const item of filtered) {
+    const realIndex = indexByItem.get(item) ?? -1;
+    const row = document.createElement('tr');
+
+    if (realIndex === state.dashSelectedIndex) {
+      row.classList.add('selected');
+    }
+
+    row.addEventListener('click', () => {
+      state.dashSelectedIndex = realIndex;
+      renderDashTable();
+      renderDashDetail(item);
+    });
+
+    row.append(
+      createDashCell(item.name, true),
+      createDashCell(item.searchedCity),
+      createCompletenessCell(item),
+      createDashCell(item.generalEmail),
+      createDashCell(item.bestContactChannel),
+      createDashCell(item.phone || item.websitePhone, false, true),
+      createStatusDotCell(item.websiteScanStatus),
+    );
+    fragment.append(row);
+  }
+
+  elements.dashTableBody.replaceChildren(fragment);
+}
+
+function createDashCell(value, isBold, isPhone) {
+  const cell = document.createElement('td');
+  const text = `${value ?? ''}`.trim();
+  if (!text) {
+    cell.textContent = '\u2013';
+    cell.classList.add('cell-empty');
+  } else {
+    cell.textContent = text;
+    if (isBold) {
+      cell.style.fontWeight = '600';
+      cell.style.color = 'var(--ink)';
+    }
+    if (isPhone) {
+      cell.classList.add('cell-phone');
+    }
+  }
+  return cell;
+}
+
+function createCompletenessCell(item) {
+  const cell = document.createElement('td');
+  const bar = document.createElement('div');
+  bar.className = 'completeness-bar';
+
+  const segments = [
+    Boolean(item.generalEmail),
+    Boolean(item.phone || item.websitePhone),
+    Boolean(item.instagramUrl || item.facebookUrl || item.linkedinUrl || item.twitterUrl),
+    Boolean(item.decisionMakerName),
+    Boolean(item.websiteScanStatus === 'ok'),
+  ];
+
+  for (const filled of segments) {
+    const seg = document.createElement('div');
+    seg.className = `completeness-seg${filled ? ' filled' : ''}`;
+    bar.append(seg);
+  }
+
+  cell.append(bar);
+  cell.title = `Email: ${segments[0] ? 'Yes' : 'No'}, Phone: ${segments[1] ? 'Yes' : 'No'}, Social: ${segments[2] ? 'Yes' : 'No'}, DM: ${segments[3] ? 'Yes' : 'No'}, Enriched: ${segments[4] ? 'Yes' : 'No'}`;
+  return cell;
+}
+
+function createStatusDotCell(status) {
+  const cell = document.createElement('td');
+  const container = document.createElement('div');
+  container.className = 'status-dot-cell';
+
+  const dot = document.createElement('span');
+  const statusText = `${status ?? 'unknown'}`;
+  const cssClass = statusText.replace(/[^a-z-]/gi, '') || 'unknown';
+  dot.className = `status-dot ${cssClass}`;
+
+  const text = document.createElement('span');
+  text.className = 'status-text';
+  text.textContent = statusText;
+
+  container.append(dot, text);
+  cell.append(container);
+  return cell;
+}
+
+function renderDashDetail(item) {
+  // Hide table, show detail view
+  elements.dashContent.hidden = true;
+  elements.dashDetailContainer.hidden = false;
+
+  elements.detailName.textContent = item.name ?? 'Unknown';
+  const parts = [item.searchedCity, item.category].filter(Boolean);
+  elements.detailSubtitle.textContent = parts.join(' \u00B7 ');
+
+  // Contact (first — most important for outreach)
+  renderDetailGrid(elements.detailContact, [
+    ['Best channel', item.bestContactChannel, 'highlight'],
+    ['Best value', item.bestContactValue, 'highlight'],
+    ['General email', item.generalEmail],
+    ['Hostel email', item.hostelEmail],
+    ['Phone (Maps)', item.phone],
+    ['Phone (website)', item.websitePhone],
+    ['Contact page', item.contactPage, 'link'],
+    ['Contact form', item.contactFormUrl, 'link'],
+    ['Strategy', item.contactStrategy],
+  ]);
+
+  // Decision Maker
+  renderDetailGrid(elements.detailDm, [
+    ['Name', item.decisionMakerName],
+    ['Role', item.decisionMakerRole],
+    ['Email', item.decisionMakerEmail],
+    ['Phone', item.decisionMakerPhone],
+    ['Source', item.publicDecisionMakerSourceUrl, 'link'],
+  ]);
+
+  // Social Media
+  const socialContainer = elements.detailSocial;
+  socialContainer.replaceChildren();
+  const socialEntries = [
+    ['Instagram', item.instagramUrl],
+    ['Facebook', item.facebookUrl],
+    ['LinkedIn', item.linkedinUrl],
+    ['Twitter/X', item.twitterUrl],
+    ['TikTok', item.tiktokUrl],
+    ['YouTube', item.youtubeUrl],
+  ];
+
+  const linksDiv = document.createElement('div');
+  linksDiv.className = 'social-links';
+  let hasSocial = false;
+
+  for (const [label, url] of socialEntries) {
+    if (!url) {
+      continue;
+    }
+    hasSocial = true;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'secondary social-link';
+    button.textContent = label;
+    button.addEventListener('click', async () => {
+      await runUiAction(() => getBridge().openExternalUrl(url), `Failed to open ${label}`);
+    });
+    linksDiv.append(button);
+  }
+
+  if (!hasSocial) {
+    const empty = document.createElement('div');
+    empty.className = 'detail-value empty';
+    empty.textContent = '\u2013';
+    socialContainer.append(empty);
+  } else {
+    socialContainer.append(linksDiv);
+  }
+
+  // Basic Info
+  renderDetailGrid(elements.detailBasic, [
+    ['Rating', item.rating != null ? `${item.rating} / 5` : null],
+    ['Reviews', item.reviewCount],
+    ['Category', item.category],
+    ['Address', item.address],
+    ['Google Maps', item.googleMapsUrl, 'link'],
+    ['Website', item.website, 'link'],
+  ]);
+
+  // Enrichment Details
+  const enrichmentFields = [
+    ['Scan status', item.websiteScanStatus],
+    ['Pages scanned', item.websitePagesScanned],
+    ['Rooms', item.roomCount],
+    ['Beds', item.bedCount],
+    ['Last seen', item.lastSeenAt],
+    ['Emails found', item.emailCandidateCount ?? (item.allFoundEmails ?? []).length],
+  ];
+
+  if (Array.isArray(item.allFoundEmails) && item.allFoundEmails.length > 0) {
+    enrichmentFields.push(['All emails', item.allFoundEmails.join(', ')]);
+  }
+
+  if (Array.isArray(item.emailCandidates) && item.emailCandidates.length > 0) {
+    for (const candidate of item.emailCandidates) {
+      const label = candidate.recommended ? `${candidate.email} *` : candidate.email;
+      const detail = `Score ${candidate.score}, ${candidate.confidence}`;
+      enrichmentFields.push([label, detail]);
+    }
+  }
+
+  renderDetailGrid(elements.detailEnrichment, enrichmentFields);
+}
+
+function renderDetailGrid(container, fields) {
+  container.replaceChildren();
+
+  for (const [label, value, style] of fields) {
+    const field = document.createElement('div');
+    field.className = 'detail-field';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'detail-label';
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement('span');
+    const displayValue = value != null && value !== '' ? `${value}` : null;
+
+    if (!displayValue) {
+      valueEl.className = 'detail-value empty';
+      valueEl.textContent = '\u2013';
+    } else if (style === 'link') {
+      valueEl.className = 'detail-value link';
+      valueEl.textContent = displayValue;
+      valueEl.addEventListener('click', async () => {
+        const safeUrl = sanitizeExternalUrl(displayValue);
+        if (safeUrl) {
+          await runUiAction(() => getBridge().openExternalUrl(safeUrl), `Failed to open link`);
+        }
+      });
+    } else if (style === 'highlight') {
+      valueEl.className = 'detail-value highlight';
+      valueEl.textContent = displayValue;
+    } else {
+      valueEl.className = 'detail-value';
+      valueEl.textContent = displayValue;
+    }
+
+    field.append(labelEl, valueEl);
+    container.append(field);
+  }
 }
