@@ -370,19 +370,20 @@ their grid search is closed-source only.
 ## Implementation Order (Recommended)
 
 ```
-Phase 1 — Quick Wins (can do all in one session)
- 1.1  End-of-results early exit ............... XS   LOW     ██░░░░░░░░
- 1.2  Category selector reorder ............... XS   LOW     █░░░░░░░░░
- 1.3  Title tag name fallback ................. XS   LOW     █░░░░░░░░░
+Phase 1 — Quick Wins                                          DONE (PR #7)
+ 1.1  End-of-results early exit ............... XS   LOW     [DONE]
+ 1.2  Category selector reorder ............... XS   LOW     [DONE]
+ 1.3  Title tag name fallback ................. XS   LOW     [DONE]
 
-Phase 2 — New Data
- 2.1  Social media extraction ................. S    LOW     ███░░░░░░░
- 2.2  Geo-coordinate targeting ................ S-M  MEDIUM  ████░░░░░░
+Phase 2 — New Data                                            DONE (PR #7)
+ 2.1  Social media extraction ................. S    LOW     [DONE]
+ 2.2  Geo-coordinate targeting ................ S-M  MEDIUM  [DONE]
 
-Phase 3 — Infrastructure
- 3.1  Resumable scraping (checkpoints) ........ M    LOW     █████░░░░░
- 3.2  Proxy support ........................... M    MEDIUM  █████░░░░░
- 3.3  Concurrent city processing .............. L    HIGH    ███████░░░
+Phase 3 — Infrastructure                                      DONE (PR #8)
+ 3.1  Resumable scraping (checkpoints) ........ M    LOW     [DONE]
+ 3.2  Proxy support ........................... M    MEDIUM  [DONE]
+ 3.3  Concurrent city processing .............. L    HIGH    [DONE]
+ 3.4  Parallel listing extraction ............. M    MEDIUM  [DONE] (bonus)
 
 Phase 4 — Advanced (Future)
  4.1  APP_INITIALIZATION_STATE parsing ........ L-XL HIGH    ████████░░
