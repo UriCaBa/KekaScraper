@@ -881,10 +881,19 @@ td a {
   flex-shrink: 0;
 }
 
-.status-dot.ok { background: var(--success); }
-.status-dot.failed { background: var(--error); }
-.status-dot.skipped { background: var(--warning); }
-.status-dot.no-website { background: var(--muted); opacity: 0.5; }
+.status-dot.ok {
+  background: var(--success);
+}
+.status-dot.failed {
+  background: var(--error);
+}
+.status-dot.skipped {
+  background: var(--warning);
+}
+.status-dot.no-website {
+  background: var(--muted);
+  opacity: 0.5;
+}
 
 .status-text {
   font-size: 0.75rem;

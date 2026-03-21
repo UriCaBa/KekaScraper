@@ -613,9 +613,7 @@ function computeStats(results) {
   const withPhone = results.filter((r) => r.phone || r.websitePhone).length;
   const withDm = results.filter((r) => r.decisionMakerName).length;
   const enriched = results.filter((r) => r.websiteScanStatus === 'ok').length;
-  const withSocial = results.filter(
-    (r) => r.instagramUrl || r.facebookUrl || r.linkedinUrl || r.twitterUrl,
-  ).length;
+  const withSocial = results.filter((r) => r.instagramUrl || r.facebookUrl || r.linkedinUrl || r.twitterUrl).length;
   return { total, withEmail, withPhone, withDm, enriched, withSocial };
 }
 

@@ -99,19 +99,37 @@ export const tests = [
       );
 
       assert.equal(
-        isEmptyListing({ name: 'Hostal Terrassa', address: 'Carrer Major 1', website: null, phone: null, category: null }),
+        isEmptyListing({
+          name: 'Hostal Terrassa',
+          address: 'Carrer Major 1',
+          website: null,
+          phone: null,
+          category: null,
+        }),
         false,
         'listing with an address is not empty',
       );
 
       assert.equal(
-        isEmptyListing({ name: 'Hostal Terrassa', address: null, website: 'https://hostal.com', phone: null, category: null }),
+        isEmptyListing({
+          name: 'Hostal Terrassa',
+          address: null,
+          website: 'https://hostal.com',
+          phone: null,
+          category: null,
+        }),
         false,
         'listing with a website is not empty',
       );
 
       assert.equal(
-        isEmptyListing({ name: 'Hostal Terrassa', address: null, website: null, phone: '+34 937 000 000', category: null }),
+        isEmptyListing({
+          name: 'Hostal Terrassa',
+          address: null,
+          website: null,
+          phone: '+34 937 000 000',
+          category: null,
+        }),
         false,
         'listing with a phone is not empty',
       );

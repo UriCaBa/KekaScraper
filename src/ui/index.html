@@ -33,7 +33,9 @@
             <span class="meta-label">App version</span>
             <strong id="app-version">-</strong>
           </div>
-          <button id="open-help" type="button" class="secondary help-text-button" aria-label="How it works">How it works</button>
+          <button id="open-help" type="button" class="secondary help-text-button" aria-label="How it works">
+            How it works
+          </button>
         </div>
       </header>
 
@@ -288,39 +290,71 @@
             <h3>Options explained</h3>
             <dl>
               <dt>Browser</dt>
-              <dd>Which Chromium-based browser to use for scraping. "Auto" tries Edge first, then Chrome, then bundled Chromium (dev builds only).</dd>
+              <dd>
+                Which Chromium-based browser to use for scraping. "Auto" tries Edge first, then Chrome, then bundled
+                Chromium (dev builds only).
+              </dd>
 
               <dt>Show the browser while scraping</dt>
-              <dd>Opens a visible browser window so you can watch the scraping process in real time. Useful for debugging or verifying that the scrape is progressing correctly.</dd>
+              <dd>
+                Opens a visible browser window so you can watch the scraping process in real time. Useful for debugging
+                or verifying that the scrape is progressing correctly.
+              </dd>
 
               <dt>Enrich results from each hostel website</dt>
-              <dd>After collecting listings from Google Maps, visits each hostel's website to find email addresses, contact forms, decision-maker details, social media links, and room/bed counts. This adds significant detail but makes the run slower.</dd>
+              <dd>
+                After collecting listings from Google Maps, visits each hostel's website to find email addresses,
+                contact forms, decision-maker details, social media links, and room/bed counts. This adds significant
+                detail but makes the run slower.
+              </dd>
 
               <dt>Parallel cities</dt>
-              <dd>Process multiple cities simultaneously (1 to 5). Higher values finish faster but use more memory and CPU. Start with 1 if unsure.</dd>
+              <dd>
+                Process multiple cities simultaneously (1 to 5). Higher values finish faster but use more memory and
+                CPU. Start with 1 if unsure.
+              </dd>
 
               <dt>Parallel listings</dt>
-              <dd>Extract multiple listings at once within a single city (1 to 3). Keep this low to reduce the chance of being rate-limited by Google Maps.</dd>
+              <dd>
+                Extract multiple listings at once within a single city (1 to 3). Keep this low to reduce the chance of
+                being rate-limited by Google Maps.
+              </dd>
 
               <dt>Proxy</dt>
-              <dd>Route all browser traffic through an HTTP or SOCKS5 proxy server. Format: <code>http://user:pass@host:port</code> or <code>socks5://host:port</code>.</dd>
+              <dd>
+                Route all browser traffic through an HTTP or SOCKS5 proxy server. Format:
+                <code>http://user:pass@host:port</code> or <code>socks5://host:port</code>.
+              </dd>
             </dl>
           </section>
 
           <section>
             <h3>Output formats</h3>
-            <p><strong>JSON</strong> &mdash; Machine-readable format, ideal for further processing, importing into databases, or feeding into other tools.</p>
-            <p><strong>CSV</strong> &mdash; Spreadsheet-compatible format that opens directly in Excel, Google Sheets, or Numbers. One row per hostel.</p>
-            <p>Files are saved to the output folder shown in the header. You can open it directly from the status panel.</p>
+            <p>
+              <strong>JSON</strong> &mdash; Machine-readable format, ideal for further processing, importing into
+              databases, or feeding into other tools.
+            </p>
+            <p>
+              <strong>CSV</strong> &mdash; Spreadsheet-compatible format that opens directly in Excel, Google Sheets, or
+              Numbers. One row per hostel.
+            </p>
+            <p>
+              Files are saved to the output folder shown in the header. You can open it directly from the status panel.
+            </p>
           </section>
 
           <section>
             <h3>Tips</h3>
             <ul>
               <li>Start with a small run (1 city, 5&ndash;10 results) to verify everything works before scaling up.</li>
-              <li>If a scrape is interrupted, re-running the same cities will resume from the last checkpoint automatically.</li>
+              <li>
+                If a scrape is interrupted, re-running the same cities will resume from the last checkpoint
+                automatically.
+              </li>
               <li>All results stay on your machine. No data is sent to any external service or cloud backend.</li>
-              <li>The results table shows a preview of up to 200 rows. Open the exported file for the complete dataset.</li>
+              <li>
+                The results table shows a preview of up to 200 rows. Open the exported file for the complete dataset.
+              </li>
             </ul>
           </section>
         </div>

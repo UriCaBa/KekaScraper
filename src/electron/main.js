@@ -243,7 +243,8 @@ function normalizeStoredFormState(rawFormState = {}) {
       'detailConcurrency',
     ),
     proxy: typeof storedFormState.proxy === 'string' ? storedFormState.proxy.trim() : fallbackState.proxy,
-    outputDir: typeof storedFormState.outputDir === 'string' ? storedFormState.outputDir.trim() : fallbackState.outputDir,
+    outputDir:
+      typeof storedFormState.outputDir === 'string' ? storedFormState.outputDir.trim() : fallbackState.outputDir,
   };
 }
 
