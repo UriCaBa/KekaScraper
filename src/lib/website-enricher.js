@@ -360,7 +360,7 @@ async function crawlWebsite(homepage, options, onEvent = () => {}) {
       }),
     );
 
-    for (const result of results) {
+    for (const [i, result] of results.entries()) {
       if (result.status === 'fulfilled') {
         const { page, pageKey } = result.value;
         scannedPages.push(page);
@@ -377,10 +377,9 @@ async function crawlWebsite(homepage, options, onEvent = () => {}) {
           }
         }
       } else {
-        const batchItem = batch[results.indexOf(result)];
         emitRunEvent(onEvent, RUN_EVENT_TYPES.WEBSITE_PAGE_SKIPPED, {
           sourceUrl: homepage.finalUrl,
-          url: batchItem.url,
+          url: batch[i].url,
           message: result.reason?.message ?? 'Unknown error',
         });
       }
