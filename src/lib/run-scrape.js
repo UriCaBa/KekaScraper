@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { defaultConfig } from '../config.js';
 import { launchBrowser } from './browser.js';
@@ -6,7 +7,7 @@ import { scrapeCity } from './maps.js';
 import { createRunEmitter, emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
 import { enrichListings } from './website-enricher.js';
 import { normalizeRunOptions } from './run-options.js';
-import { timestampLabel } from './utils.js';
+import { atomicWriteJson, ensureDir, mapWithConcurrency, timestampLabel } from './utils.js';
 
 export async function runScrape(inputOptions = {}, hooks = {}) {
   const emit = createRunEmitter(hooks.onEvent);
@@ -18,54 +19,81 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     outputDir,
   };
 
-  emitRunEvent(emit, RUN_EVENT_TYPES.RUN_STARTED, {
-    startedAt: startedAt.toISOString(),
-    cities: normalizedRunConfig.cities,
-    outputDirectory: outputDir,
-  });
+  await ensureDir(outputDir);
+
+  const checkpoint = normalizedRunConfig.resume ? await loadCheckpoint(outputDir) : null;
+  const completedCities = new Set(checkpoint?.completedCities ?? []);
+  const allResults = [...(checkpoint?.results ?? [])];
+  const runId = checkpoint?.runId ?? timestampLabel();
+  const remainingCities = normalizedRunConfig.cities.filter((city) => !completedCities.has(city));
+
+  if (checkpoint && completedCities.size > 0) {
+    emitRunEvent(emit, RUN_EVENT_TYPES.RUN_STARTED, {
+      startedAt: startedAt.toISOString(),
+      cities: normalizedRunConfig.cities,
+      outputDirectory: outputDir,
+      resumed: true,
+      resumedCities: completedCities.size,
+      remainingCities: remainingCities.length,
+    });
+  } else {
+    emitRunEvent(emit, RUN_EVENT_TYPES.RUN_STARTED, {
+      startedAt: startedAt.toISOString(),
+      cities: normalizedRunConfig.cities,
+      outputDirectory: outputDir,
+    });
+  }
 
   const { browser, context, launchSummary } = await launchBrowser(normalizedRunConfig);
   emitRunEvent(emit, RUN_EVENT_TYPES.BROWSER_READY, {
     requestedBrowserChannel: normalizedRunConfig.browserChannel,
     selectedBrowserLabel: launchSummary.selectedCandidateLabel,
+    proxyServer: normalizedRunConfig.proxy?.server ?? null,
   });
 
-  const allResults = [];
   let cityFailures = 0;
+  const concurrency = Math.min(normalizedRunConfig.concurrency, remainingCities.length || 1);
+  const totalCities = normalizedRunConfig.cities.length;
+
+  const scrapeCityOptions = {
+    queryPrefix: normalizedRunConfig.queryPrefix,
+    resultLimit: normalizedRunConfig.resultLimit,
+    maxScrollRounds: normalizedRunConfig.maxScrollRounds,
+    retryCount: normalizedRunConfig.retryCount,
+    retryDelayMs: normalizedRunConfig.retryDelayMs,
+    detailPauseMs: normalizedRunConfig.detailPauseMs,
+    coordinates: normalizedRunConfig.coordinates,
+  };
 
   try {
-    const page = await context.newPage();
-    const detailPage = await context.newPage();
-
-    for (const [index, city] of normalizedRunConfig.cities.entries()) {
-      emitRunEvent(emit, RUN_EVENT_TYPES.CITY_STARTED, {
-        city,
-        index: index + 1,
-        totalCities: normalizedRunConfig.cities.length,
-      });
+    await mapWithConcurrency(remainingCities, concurrency, async (city) => {
+      const cityIndex = normalizedRunConfig.cities.indexOf(city) + 1;
+      const page = await context.newPage();
+      const detailPage = await context.newPage();
 
       try {
-        const cityRun = await scrapeCity(page, detailPage, {
+        emitRunEvent(emit, RUN_EVENT_TYPES.CITY_STARTED, {
           city,
-          queryPrefix: normalizedRunConfig.queryPrefix,
-          resultLimit: normalizedRunConfig.resultLimit,
-          maxScrollRounds: normalizedRunConfig.maxScrollRounds,
-          retryCount: normalizedRunConfig.retryCount,
-          retryDelayMs: normalizedRunConfig.retryDelayMs,
-          detailPauseMs: normalizedRunConfig.detailPauseMs,
-          coordinates: normalizedRunConfig.coordinates,
+          index: cityIndex,
+          totalCities,
+        });
+
+        const cityRun = await scrapeCity(page, detailPage, {
+          ...scrapeCityOptions,
+          city,
           onEvent: emit,
         });
 
         const cityCompleted = buildCityCompletedPayload({
           city,
-          index: index + 1,
-          totalCities: normalizedRunConfig.cities.length,
+          index: cityIndex,
+          totalCities,
           cityRun,
           totalResultCount: allResults.length,
         });
-        const cityResults = cityCompleted.cityResults;
-        allResults.push(...cityResults);
+        allResults.push(...cityCompleted.cityResults);
+        completedCities.add(city);
+
         emitRunEvent(emit, RUN_EVENT_TYPES.CITY_COMPLETED, {
           city: cityCompleted.city,
           index: cityCompleted.index,
@@ -74,16 +102,21 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
           totalResultCount: allResults.length,
           cityStats: cityCompleted.cityStats,
         });
+
+        await saveCheckpoint(outputDir, runId, completedCities, allResults, normalizedRunConfig);
       } catch (error) {
         cityFailures += 1;
         emitRunEvent(emit, RUN_EVENT_TYPES.CITY_FAILED, {
           city,
-          index: index + 1,
-          totalCities: normalizedRunConfig.cities.length,
+          index: cityIndex,
+          totalCities,
           message: error.message,
         });
+      } finally {
+        await page.close().catch(() => {});
+        await detailPage.close().catch(() => {});
       }
-    }
+    });
   } finally {
     await Promise.allSettled([context.close(), browser.close()]);
   }
@@ -105,6 +138,8 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     baseFilename,
     formats: normalizedRunConfig.formats,
   });
+
+  await deleteCheckpoint(outputDir, runId);
 
   const finishedAt = new Date();
   const summary = buildSummary({
@@ -201,4 +236,58 @@ function normalizeCityStats(stats, cityResultCount) {
 
 function normalizeCount(value, fallback = 0) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
+}
+
+const CHECKPOINT_SUFFIX = '-checkpoint.json';
+
+async function saveCheckpoint(outputDir, runId, completedCities, results, config) {
+  try {
+    const filePath = path.join(outputDir, `${runId}${CHECKPOINT_SUFFIX}`);
+    await atomicWriteJson(filePath, {
+      runId,
+      config: { queryPrefix: config.queryPrefix, resultLimit: config.resultLimit, enrichWebsite: config.enrichWebsite },
+      completedCities: [...completedCities],
+      results,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch {
+    // Checkpoint save failure is non-fatal — scraping continues.
+  }
+}
+
+export async function loadCheckpoint(outputDir) {
+  try {
+    const entries = await fs.readdir(outputDir).catch(() => []);
+    const checkpointFiles = entries
+      .filter((entry) => entry.endsWith(CHECKPOINT_SUFFIX))
+      .sort()
+      .reverse();
+
+    if (checkpointFiles.length === 0) {
+      return null;
+    }
+
+    const filePath = path.join(outputDir, checkpointFiles[0]);
+    const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
+
+    if (!data.runId || !Array.isArray(data.completedCities) || !Array.isArray(data.results)) {
+      return null;
+    }
+
+    return {
+      runId: data.runId,
+      completedCities: data.completedCities,
+      results: data.results,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function deleteCheckpoint(outputDir, runId) {
+  try {
+    await fs.unlink(path.join(outputDir, `${runId}${CHECKPOINT_SUFFIX}`));
+  } catch {
+    // Checkpoint cleanup failure is non-fatal.
+  }
 }

@@ -124,4 +124,66 @@ export const tests = [
       );
     },
   },
+  {
+    name: 'normalizeRunOptions parses proxy URL into server, username, and password',
+    run: () => {
+      const result = normalizeRunOptions(
+        { cities: 'Barcelona', proxy: 'http://user:pass@proxy.example.com:8080' },
+        { requireCities: true },
+      );
+      assert.deepEqual(result.proxy, {
+        server: 'http://proxy.example.com:8080',
+        username: 'user',
+        password: 'pass',
+      });
+    },
+  },
+  {
+    name: 'normalizeRunOptions accepts proxy without credentials',
+    run: () => {
+      const result = normalizeRunOptions(
+        { cities: 'Barcelona', proxy: 'socks5://proxy.example.com:1080' },
+        { requireCities: true },
+      );
+      assert.equal(result.proxy.server, 'socks5://proxy.example.com:1080');
+      assert.equal(result.proxy.username, undefined);
+    },
+  },
+  {
+    name: 'normalizeRunOptions returns undefined proxy when not provided',
+    run: () => {
+      const result = normalizeRunOptions({ cities: 'Barcelona' }, { requireCities: true });
+      assert.equal(result.proxy, undefined);
+    },
+  },
+  {
+    name: 'normalizeRunOptions throws for invalid proxy URL',
+    run: () => {
+      assert.throws(
+        () => normalizeRunOptions({ cities: 'Barcelona', proxy: 'not-a-url' }, { requireCities: true }),
+        /Invalid proxy URL/,
+      );
+    },
+  },
+  {
+    name: 'normalizeRunOptions defaults concurrency to 1',
+    run: () => {
+      const result = normalizeRunOptions({ cities: 'Barcelona' }, { requireCities: true });
+      assert.equal(result.concurrency, 1);
+    },
+  },
+  {
+    name: 'normalizeRunOptions accepts custom concurrency',
+    run: () => {
+      const result = normalizeRunOptions({ cities: 'Barcelona', concurrency: 3 }, { requireCities: true });
+      assert.equal(result.concurrency, 3);
+    },
+  },
+  {
+    name: 'normalizeRunOptions defaults resume to false',
+    run: () => {
+      const result = normalizeRunOptions({ cities: 'Barcelona' }, { requireCities: true });
+      assert.equal(result.resume, false);
+    },
+  },
 ];

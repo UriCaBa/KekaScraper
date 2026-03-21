@@ -38,10 +38,20 @@ Reusable local scraper for Google Maps hostel searches by city, with both a CLI 
   - `lastSeenAt`
   - `roomCount`
   - `bedCount`
+  - `instagramUrl`
+  - `facebookUrl`
+  - `linkedinUrl`
+  - `twitterUrl`
+  - `tiktokUrl`
+  - `youtubeUrl`
 - Writes output locally:
   - CLI runs default to JSON in `output/`
   - the desktop app writes to your Documents folder under `KekaScraper/output`
 - Includes a local Electron desktop app for non-technical users targeting Windows and macOS
+- Supports resumable scraping with automatic checkpoints for multi-city runs
+- Concurrent city processing for faster multi-city scrapes
+- Optional proxy routing for all browser traffic
+- Geo-coordinate targeting for geographically precise searches
 
 ## Requirements
 
@@ -112,6 +122,30 @@ Run in visible browser mode:
 npm run scrape -- --cities "Barcelona" --headful
 ```
 
+Run with geo-coordinate targeting:
+
+```bash
+npm run scrape -- --cities "Barcelona" --lat 41.3874 --lng 2.1686 --zoom 15
+```
+
+Run multiple cities in parallel:
+
+```bash
+npm run scrape -- --cities "Barcelona;Madrid;Bilbao" --concurrency 3 --limit 10
+```
+
+Resume an interrupted run:
+
+```bash
+npm run scrape -- --cities "Barcelona;Madrid;Bilbao" --resume
+```
+
+Route traffic through a proxy:
+
+```bash
+npm run scrape -- --cities "Barcelona" --proxy "http://user:pass@proxy:8080"
+```
+
 ## Smoke tests
 
 Use the renderer smoke test when you want a stable Playwright check of the desktop UI logic without launching Electron:
@@ -142,6 +176,12 @@ npm run smoke:electron
 - `--enrich` Enable website enrichment
 - `--no-enrich` Disable website enrichment
 - `--website-page-limit 8` Max same-domain pages to scan per website
+- `--lat 41.3874` Latitude for geo-targeted search
+- `--lng 2.1686` Longitude for geo-targeted search
+- `--zoom 15` Zoom level for geo-targeting (1-21, default 15)
+- `--proxy "http://user:pass@host:port"` Route all browser traffic through a proxy
+- `--resume` Resume the last interrupted run from its checkpoint
+- `--concurrency 3` Process N cities in parallel (default 1)
 
 ## Notes and limits
 
@@ -159,3 +199,12 @@ npm run smoke:electron
 - The recommended contact fields are `bestContactChannel`, `bestContactValue`, and `contactStrategy`.
 - Room and bed counts are text heuristics and will often be missing.
 - Consent screens, anti-bot checks, regional UI variants, and low-result pages can affect reliability.
+- Social media links (Instagram, Facebook, LinkedIn, Twitter/X, TikTok, YouTube) are extracted automatically during website enrichment. No additional configuration needed.
+- Geo-coordinate targeting appends `/@lat,lng,zoom` to the Google Maps search URL, constraining results to a geographic viewport. Both `--lat` and `--lng` must be provided together.
+- Checkpoints are saved after each city completes. Use `--resume` to continue an interrupted multi-city run. The checkpoint file is deleted after a successful full run.
+- Concurrent scraping (`--concurrency N`) opens N browser tabs simultaneously. Each city gets its own isolated pages. Use with caution on machines with limited RAM.
+- Proxy support accepts HTTP, HTTPS, and SOCKS5 proxies. Credentials in the URL are passed to the browser but never logged. Format: `protocol://user:pass@host:port`. Examples:
+  - `http://user123:pass456@proxy.example.com:8080` (HTTP with auth)
+  - `socks5://user:pass@192.168.1.100:1080` (SOCKS5 with auth)
+  - `http://proxy.example.com:3128` (HTTP without auth)
+  - Proxies route all browser traffic (Google Maps searches and hostel website visits) through the specified server. Google sees the proxy IP instead of yours, which helps avoid rate limiting on large scrapes. Paid residential proxy services (BrightData, Oxylabs, SmartProxy) work best; free proxies are typically too slow and unreliable for scraping.

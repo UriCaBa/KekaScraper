@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 
-import { buildCityCompletedPayload, determineOutcome } from '../src/lib/run-scrape.js';
+import { buildCityCompletedPayload, determineOutcome, loadCheckpoint } from '../src/lib/run-scrape.js';
 
 export const tests = [
   {
@@ -68,6 +69,58 @@ export const tests = [
       assert.equal(determineOutcome(2, 3, 5), 'partial');
       assert.equal(determineOutcome(0, 3, 10), 'success');
       assert.equal(determineOutcome(0, 1, 0), 'empty');
+    },
+  },
+  {
+    name: 'loadCheckpoint returns null when output directory is empty',
+    run: async () => {
+      const os = await import('node:os');
+      const fs = await import('node:fs/promises');
+      const tmpDir = await fs.mkdtemp(path.join(os.default.tmpdir(), 'keka-test-'));
+      try {
+        const result = await loadCheckpoint(tmpDir);
+        assert.equal(result, null);
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
+    name: 'loadCheckpoint returns null for corrupted checkpoint file',
+    run: async () => {
+      const os = await import('node:os');
+      const fs = await import('node:fs/promises');
+      const tmpDir = await fs.mkdtemp(path.join(os.default.tmpdir(), 'keka-test-'));
+      try {
+        await fs.writeFile(path.join(tmpDir, '20260321-checkpoint.json'), 'not json', 'utf8');
+        const result = await loadCheckpoint(tmpDir);
+        assert.equal(result, null);
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
+    name: 'loadCheckpoint reads valid checkpoint and returns structured data',
+    run: async () => {
+      const os = await import('node:os');
+      const fs = await import('node:fs/promises');
+      const tmpDir = await fs.mkdtemp(path.join(os.default.tmpdir(), 'keka-test-'));
+      try {
+        const checkpoint = {
+          runId: '20260321-143022',
+          completedCities: ['Barcelona', 'Madrid'],
+          results: [{ name: 'Hostel A' }, { name: 'Hostel B' }],
+          updatedAt: '2026-03-21T14:45:10.000Z',
+        };
+        await fs.writeFile(path.join(tmpDir, '20260321-143022-checkpoint.json'), JSON.stringify(checkpoint), 'utf8');
+        const result = await loadCheckpoint(tmpDir);
+        assert.deepEqual(result.completedCities, ['Barcelona', 'Madrid']);
+        assert.equal(result.results.length, 2);
+        assert.equal(result.runId, '20260321-143022');
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
     },
   },
 ];

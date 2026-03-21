@@ -44,6 +44,12 @@ export async function ensureDir(dirPath) {
   await fs.mkdir(dirPath, { recursive: true });
 }
 
+export async function atomicWriteJson(filePath, data) {
+  const tmpPath = `${filePath}.tmp`;
+  await fs.writeFile(tmpPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  await fs.rename(tmpPath, filePath);
+}
+
 export async function mapWithConcurrency(items, concurrency, mapper) {
   const targetConcurrency = Math.max(1, Number.parseInt(concurrency, 10) || 1);
   const results = new Array(items.length);
