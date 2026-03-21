@@ -28,6 +28,7 @@ const state = {
 };
 
 const RESULTS_PREVIEW_LIMIT = 200;
+const DASH_ROW_LIMIT = 500;
 
 const elements = {
   form: document.querySelector('#scrape-form'),
@@ -131,12 +132,14 @@ async function bootstrap() {
     }
   });
 
-  elements.pickOutputFolderButton.addEventListener('click', async () => {
-    const pickedPath = await bridge.pickOutputFolder();
-    if (pickedPath) {
-      state.outputDirectory = pickedPath;
-      elements.outputDirectory.textContent = pickedPath;
-    }
+  elements.pickOutputFolderButton.addEventListener('click', () => {
+    return runUiAction(async () => {
+      const pickedPath = await bridge.pickOutputFolder();
+      if (pickedPath) {
+        state.outputDirectory = pickedPath;
+        elements.outputDirectory.textContent = pickedPath;
+      }
+    }, 'Failed to pick an output folder');
   });
 
   elements.openHelpButton.addEventListener('click', () => {
@@ -583,7 +586,14 @@ async function handleLoadResults() {
     return;
   }
 
-  state.dashResults = data.results.filter((item) => !isPhantomListing(item));
+  const filtered = data.results.filter((item) => !isPhantomListing(item));
+  state.dashResults = filtered.slice(0, DASH_ROW_LIMIT);
+  if (filtered.length > DASH_ROW_LIMIT) {
+    appendLog(
+      `Dashboard shows first ${DASH_ROW_LIMIT} of ${filtered.length} results. Open the exported file for the full dataset.`,
+    );
+    renderStatus();
+  }
   state.dashSelectedIndex = -1;
   state.dashFileName = data.fileName;
   state.dashSearchQuery = '';
@@ -659,10 +669,15 @@ function renderDashTable() {
     footerCount.textContent = `Showing ${filtered.length} of ${state.dashResults.length} results`;
   }
 
+  const indexByItem = new Map();
+  state.dashResults.forEach((dashItem, index) => {
+    indexByItem.set(dashItem, index);
+  });
+
   const fragment = document.createDocumentFragment();
 
   for (const item of filtered) {
-    const realIndex = state.dashResults.indexOf(item);
+    const realIndex = indexByItem.get(item) ?? -1;
     const row = document.createElement('tr');
 
     if (realIndex === state.dashSelectedIndex) {

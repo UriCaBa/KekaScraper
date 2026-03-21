@@ -127,7 +127,10 @@ function registerIpcHandlers() {
     }
 
     const formState = normalizeFormState(rawFormState);
-    await savePreferences(app.getPath('userData'), formState);
+    await savePreferences(app.getPath('userData'), {
+      ...formState,
+      outputDir: userOutputDirectory ?? '',
+    });
 
     activeRunPromise = startDesktopScrape(buildRunConfig(formState));
 
