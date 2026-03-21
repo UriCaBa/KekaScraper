@@ -63,6 +63,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     retryDelayMs: normalizedRunConfig.retryDelayMs,
     detailPauseMs: normalizedRunConfig.detailPauseMs,
     coordinates: normalizedRunConfig.coordinates,
+    detailConcurrency: normalizedRunConfig.detailConcurrency,
   };
 
   try {

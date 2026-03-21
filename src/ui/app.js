@@ -49,6 +49,7 @@ const elements = {
   resultsTableBody: document.querySelector('#results-table-body'),
   outputFiles: document.querySelector('#output-files'),
   concurrency: document.querySelector('#concurrency'),
+  detailConcurrency: document.querySelector('#detail-concurrency'),
   proxy: document.querySelector('#proxy'),
 };
 
@@ -300,6 +301,7 @@ function populateForm(formState) {
   elements.enrichWebsite.checked = formState.enrichWebsite !== false;
   elements.headful.checked = Boolean(formState.headful);
   elements.concurrency.value = formState.concurrency ?? 1;
+  elements.detailConcurrency.value = formState.detailConcurrency ?? 1;
   elements.proxy.value = formState.proxy ?? '';
 
   const selectedFormats = new Set(formState.formats ?? ['json', 'csv']);
@@ -349,6 +351,7 @@ function readFormState() {
     headful: elements.headful.checked,
     formats: selectedFormats,
     concurrency: Number.parseInt(elements.concurrency.value, 10) || 1,
+    detailConcurrency: Number.parseInt(elements.detailConcurrency.value, 10) || 1,
     proxy: elements.proxy.value.trim() || undefined,
   };
 }
@@ -363,6 +366,7 @@ function setFormDisabled(disabled) {
     elements.enrichWebsite,
     elements.headful,
     elements.concurrency,
+    elements.detailConcurrency,
     elements.proxy,
     ...elements.formatCheckboxes,
   ]) {

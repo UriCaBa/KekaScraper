@@ -47,6 +47,7 @@ export function normalizeRunOptions(input = {}, { requireCities = true } = {}) {
     proxy: normalizeProxy(input),
     resume: normalizeBoolean(input.resume, false),
     concurrency: normalizeInteger(input.concurrency, 1, 'concurrency', { min: 1 }),
+    detailConcurrency: normalizeInteger(input.detailConcurrency, 1, 'detailConcurrency', { min: 1 }),
   };
 }
 

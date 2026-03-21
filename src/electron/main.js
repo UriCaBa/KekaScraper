@@ -149,6 +149,7 @@ function getDefaultFormState() {
     enrichWebsite: defaultConfig.enrichWebsite,
     websitePageLimit: defaultConfig.websitePageLimit,
     concurrency: 1,
+    detailConcurrency: 1,
     proxy: '',
   };
 }
@@ -171,6 +172,11 @@ function normalizeStoredFormState(rawFormState = {}) {
       'websitePageLimit',
     ),
     concurrency: normalizeStoredInteger(storedFormState.concurrency, fallbackState.concurrency, 'concurrency'),
+    detailConcurrency: normalizeStoredInteger(
+      storedFormState.detailConcurrency,
+      fallbackState.detailConcurrency,
+      'detailConcurrency',
+    ),
     proxy: typeof storedFormState.proxy === 'string' ? storedFormState.proxy.trim() : fallbackState.proxy,
   };
 }
@@ -205,6 +211,7 @@ function normalizeFormState(rawFormState = {}) {
     enrichWebsite: normalizeBoolean(formState.enrichWebsite, defaultConfig.enrichWebsite),
     websitePageLimit: normalizeInteger(formState.websitePageLimit, defaultConfig.websitePageLimit, 'websitePageLimit'),
     concurrency: normalizeInteger(formState.concurrency, 1, 'concurrency', { min: 1 }),
+    detailConcurrency: normalizeInteger(formState.detailConcurrency, 1, 'detailConcurrency', { min: 1 }),
     proxy: typeof formState.proxy === 'string' ? formState.proxy.trim() : '',
   };
 }
@@ -250,6 +257,7 @@ function buildRunConfig(formState) {
     outputDir: getDesktopOutputDirectory(),
     allowBundledChromium: !app.isPackaged,
     concurrency: formState.concurrency,
+    detailConcurrency: formState.detailConcurrency,
     proxy: formState.proxy || undefined,
   };
 }

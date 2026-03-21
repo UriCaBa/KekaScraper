@@ -1,4 +1,4 @@
-import { firstNonEmpty, parseRatingAndReviews, retry, stripFieldPrefix } from './utils.js';
+import { firstNonEmpty, mapWithConcurrency, parseRatingAndReviews, retry, stripFieldPrefix } from './utils.js';
 import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
 import { jitteredSleep } from './stealth.js';
 
@@ -81,6 +81,8 @@ const STREET_TOKENS = new Set([
   'way',
 ]);
 
+const MAX_DETAIL_CONCURRENCY = 3;
+
 export async function scrapeCity(page, detailPage, options) {
   const {
     city,
@@ -90,6 +92,7 @@ export async function scrapeCity(page, detailPage, options) {
     retryCount,
     retryDelayMs,
     detailPauseMs,
+    detailConcurrency = 1,
     coordinates,
     onEvent,
   } = options;
@@ -154,14 +157,17 @@ export async function scrapeCity(page, detailPage, options) {
     });
     stats.uniqueCandidates = seenListingUrls.size;
 
-    for (let candidateOffset = 0; candidateOffset < newCandidates.length; candidateOffset += 1) {
+    const effectiveConcurrency = Math.min(Math.max(detailConcurrency, 1), MAX_DETAIL_CONCURRENCY);
+    const context = page.context();
+    const candidateBaseIndex = seenListingUrls.size - newCandidates.length;
+
+    await mapWithConcurrency(newCandidates, effectiveConcurrency, async (candidate, candidateOffset) => {
       if (results.length >= resultLimit) {
-        break;
+        return;
       }
 
-      const candidate = newCandidates[candidateOffset];
       const { listingUrl } = candidate;
-      const candidateIndex = seenListingUrls.size - newCandidates.length + candidateOffset + 1;
+      const candidateIndex = candidateBaseIndex + candidateOffset + 1;
       stats.listingsProcessed += 1;
 
       emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_STARTED, {
@@ -171,8 +177,10 @@ export async function scrapeCity(page, detailPage, options) {
         listingUrl,
       });
 
+      const workerPage = effectiveConcurrency > 1 ? await context.newPage() : detailPage;
+
       try {
-        const item = await retry(() => extractListing(detailPage, listingUrl, city, candidate.searchQuery), {
+        const item = await retry(() => extractListing(workerPage, listingUrl, city, candidate.searchQuery), {
           retries: retryCount,
           delayMs: retryDelayMs,
           label: `extract listing ${candidateIndex}`,
@@ -200,7 +208,7 @@ export async function scrapeCity(page, detailPage, options) {
             negativeSignals: listingMatch.negativeSignals,
           });
           await jitteredSleep(detailPauseMs);
-          continue;
+          return;
         }
 
         results.push(item);
@@ -216,8 +224,12 @@ export async function scrapeCity(page, detailPage, options) {
           message: error?.message ?? String(error),
         });
         await jitteredSleep(detailPauseMs);
+      } finally {
+        if (effectiveConcurrency > 1) {
+          await workerPage.close().catch(() => {});
+        }
       }
-    }
+    });
   }
 
   return {

@@ -170,6 +170,10 @@ function parseArgs(argv) {
         options.concurrency = parseInteger(expectValue(argv, index, arg), arg, { min: 1 });
         index += 1;
         break;
+      case '--detail-concurrency':
+        options.detailConcurrency = parseInteger(expectValue(argv, index, arg), arg, { min: 1 });
+        index += 1;
+        break;
       default:
         if (arg.startsWith('-')) {
           throw new Error(`Unknown argument: ${arg}`);
@@ -235,6 +239,7 @@ Options:
   --proxy "http://u:p@host:port"  Route traffic through a proxy
   --resume                 Resume the last interrupted run
   --concurrency 3          Process N cities in parallel (default 1)
+  --detail-concurrency 3   Extract N listings in parallel within a city (default 1, max 3)
   --help                   Show this help
 `);
 }

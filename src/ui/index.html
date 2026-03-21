@@ -95,6 +95,12 @@
                 </label>
 
                 <label class="field">
+                  <span>Parallel listings</span>
+                  <input id="detail-concurrency" name="detailConcurrency" type="number" min="1" max="3" step="1" />
+                  <small>Extract N listings at once within a city (default 1, max 3)</small>
+                </label>
+
+                <label class="field">
                   <span>Proxy</span>
                   <input id="proxy" name="proxy" type="text" placeholder="http://user:pass@host:port" />
                   <small>Optional HTTP/SOCKS5 proxy for all traffic</small>
