@@ -6,6 +6,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(currentDir, '..');
 
 export const defaultConfig = {
+  appVersion: '1.0.0',
   browserChannel: 'auto',
   formats: ['json'],
   headless: true,
