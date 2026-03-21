@@ -21,7 +21,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
 
   await ensureDir(outputDir);
 
-  const checkpoint = normalizedRunConfig.resume ? await loadCheckpoint(outputDir) : null;
+  const checkpoint = normalizedRunConfig.resume ? await loadCheckpoint(outputDir, normalizedRunConfig.cities) : null;
   const completedCities = new Set(checkpoint?.completedCities ?? []);
   const allResults = [...(checkpoint?.results ?? [])];
   const runId = checkpoint?.runId ?? timestampLabel();
@@ -140,8 +140,6 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     formats: normalizedRunConfig.formats,
   });
 
-  await deleteCheckpoint(outputDir, runId);
-
   const finishedAt = new Date();
   const summary = buildSummary({
     startedAt,
@@ -153,6 +151,10 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     outputFiles,
     launchSummary,
   });
+
+  if (cityFailures === 0) {
+    await deleteCheckpoint(outputDir, runId);
+  }
 
   emitRunEvent(emit, RUN_EVENT_TYPES.RUN_COMPLETED, {
     summary,
@@ -246,7 +248,7 @@ async function saveCheckpoint(outputDir, runId, completedCities, results, config
     const filePath = path.join(outputDir, `${runId}${CHECKPOINT_SUFFIX}`);
     await atomicWriteJson(filePath, {
       runId,
-      config: { queryPrefix: config.queryPrefix, resultLimit: config.resultLimit, enrichWebsite: config.enrichWebsite },
+      cities: config.cities,
       completedCities: [...completedCities],
       results,
       updatedAt: new Date().toISOString(),
@@ -256,33 +258,41 @@ async function saveCheckpoint(outputDir, runId, completedCities, results, config
   }
 }
 
-export async function loadCheckpoint(outputDir) {
-  try {
-    const entries = await fs.readdir(outputDir).catch(() => []);
-    const checkpointFiles = entries
-      .filter((entry) => entry.endsWith(CHECKPOINT_SUFFIX))
-      .sort()
-      .reverse();
+export async function loadCheckpoint(outputDir, expectedCities) {
+  const entries = await fs.readdir(outputDir).catch(() => []);
+  const checkpointFiles = entries
+    .filter((entry) => entry.endsWith(CHECKPOINT_SUFFIX))
+    .sort()
+    .reverse();
 
-    if (checkpointFiles.length === 0) {
-      return null;
+  for (const filename of checkpointFiles) {
+    try {
+      const filePath = path.join(outputDir, filename);
+      const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
+
+      if (!data.runId || !Array.isArray(data.completedCities) || !Array.isArray(data.results)) {
+        continue;
+      }
+
+      if (expectedCities && Array.isArray(data.cities)) {
+        const stored = [...data.cities].sort().join('\0');
+        const expected = [...expectedCities].sort().join('\0');
+        if (stored !== expected) {
+          continue;
+        }
+      }
+
+      return {
+        runId: data.runId,
+        completedCities: data.completedCities,
+        results: data.results,
+      };
+    } catch {
+      continue;
     }
-
-    const filePath = path.join(outputDir, checkpointFiles[0]);
-    const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
-
-    if (!data.runId || !Array.isArray(data.completedCities) || !Array.isArray(data.results)) {
-      return null;
-    }
-
-    return {
-      runId: data.runId,
-      completedCities: data.completedCities,
-      results: data.results,
-    };
-  } catch {
-    return null;
   }
+
+  return null;
 }
 
 async function deleteCheckpoint(outputDir, runId) {

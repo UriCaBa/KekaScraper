@@ -350,8 +350,8 @@ function readFormState() {
     enrichWebsite: elements.enrichWebsite.checked,
     headful: elements.headful.checked,
     formats: selectedFormats,
-    concurrency: Number.parseInt(elements.concurrency.value, 10) || 1,
-    detailConcurrency: Number.parseInt(elements.detailConcurrency.value, 10) || 1,
+    concurrency: Math.max(1, Number.parseInt(elements.concurrency.value, 10) || 1),
+    detailConcurrency: Math.max(1, Number.parseInt(elements.detailConcurrency.value, 10) || 1),
     proxy: elements.proxy.value.trim() || undefined,
   };
 }

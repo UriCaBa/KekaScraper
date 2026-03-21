@@ -32,24 +32,30 @@ export const tests = [
     name: 'mapWithConcurrency actually runs tasks in parallel when concurrency > 1',
     run: async () => {
       const timeline = [];
-      const tasks = [50, 50, 50, 50];
-
-      const startTime = Date.now();
-      await mapWithConcurrency(tasks, 3, async (delayMs, index) => {
-        timeline.push({ index, event: 'start', at: Date.now() - startTime });
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-        timeline.push({ index, event: 'end', at: Date.now() - startTime });
+      let allowTask0Resolve;
+      const allowTask0 = new Promise((resolve) => {
+        allowTask0Resolve = resolve;
       });
-      const totalTime = Date.now() - startTime;
 
-      // With concurrency=3, 4 tasks of 50ms each should take ~100ms (2 rounds), not ~200ms (4 rounds)
-      assert.ok(totalTime < 180, `Expected <180ms for parallel execution, got ${totalTime}ms`);
+      const work = mapWithConcurrency([0, 1, 2], 3, async (_, index) => {
+        timeline.push({ index, event: 'start' });
+        if (index === 0) {
+          await allowTask0;
+        }
+        if (index === 1) {
+          allowTask0Resolve();
+        }
+        timeline.push({ index, event: 'end' });
+      });
 
-      // At least 2 tasks should have started before any ended
-      const startEvents = timeline.filter((e) => e.event === 'start');
-      const firstEnd = timeline.find((e) => e.event === 'end');
-      const startsBeforeFirstEnd = startEvents.filter((e) => e.at <= firstEnd.at).length;
-      assert.ok(startsBeforeFirstEnd >= 2, `Expected >=2 tasks started before first end, got ${startsBeforeFirstEnd}`);
+      await Promise.race([
+        work,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Parallelism timeout')), 2000)),
+      ]);
+
+      const task0End = timeline.findIndex((e) => e.index === 0 && e.event === 'end');
+      const task1Start = timeline.findIndex((e) => e.index === 1 && e.event === 'start');
+      assert.ok(task1Start < task0End, 'Task 1 should start before task 0 ends (parallel execution)');
     },
   },
   {

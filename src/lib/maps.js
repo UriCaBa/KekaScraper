@@ -161,75 +161,90 @@ export async function scrapeCity(page, detailPage, options) {
     const context = page.context();
     const candidateBaseIndex = seenListingUrls.size - newCandidates.length;
 
-    await mapWithConcurrency(newCandidates, effectiveConcurrency, async (candidate, candidateOffset) => {
-      if (results.length >= resultLimit) {
-        return;
-      }
+    // Create a reusable page pool (or use the shared detailPage for concurrency=1)
+    const pagePool =
+      effectiveConcurrency > 1
+        ? await Promise.all(Array.from({ length: effectiveConcurrency }, () => context.newPage()))
+        : [detailPage];
+    let nextPoolSlot = 0;
 
-      const { listingUrl } = candidate;
-      const candidateIndex = candidateBaseIndex + candidateOffset + 1;
-      stats.listingsProcessed += 1;
+    // Limit candidates dispatched to avoid exceeding resultLimit under concurrency
+    const remainingSlots = resultLimit - results.length;
+    const cappedCandidates = newCandidates.slice(0, remainingSlots + effectiveConcurrency);
 
-      emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_STARTED, {
-        city,
-        index: candidateIndex,
-        totalListings: seenListingUrls.size,
-        listingUrl,
-      });
-
-      const workerPage = effectiveConcurrency > 1 ? await context.newPage() : detailPage;
-
-      try {
-        const item = await retry(() => extractListing(workerPage, listingUrl, city, candidate.searchQuery), {
-          retries: retryCount,
-          delayMs: retryDelayMs,
-          label: `extract listing ${candidateIndex}`,
-          onEvent: emit,
-          eventContext: {
-            city,
-            index: candidateIndex,
-            totalListings: seenListingUrls.size,
-            listingUrl,
-          },
-        });
-
-        const listingMatch = scoreListingMatch(item);
-        if (!listingMatch.accepted) {
-          stats.listingsSkipped += 1;
-          emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_SKIPPED, {
-            city,
-            index: candidateIndex,
-            totalListings: seenListingUrls.size,
-            listingUrl,
-            name: item.name ?? null,
-            reason: listingMatch.reason,
-            score: listingMatch.score,
-            positiveSignals: listingMatch.positiveSignals,
-            negativeSignals: listingMatch.negativeSignals,
-          });
-          await jitteredSleep(detailPauseMs);
+    try {
+      await mapWithConcurrency(cappedCandidates, effectiveConcurrency, async (candidate, candidateOffset) => {
+        if (results.length >= resultLimit) {
           return;
         }
 
-        results.push(item);
-        stats.listingsAccepted += 1;
-        await jitteredSleep(detailPauseMs);
-      } catch (error) {
-        stats.listingFailures += 1;
-        emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_FAILED, {
+        const poolSlot = nextPoolSlot;
+        nextPoolSlot = (nextPoolSlot + 1) % pagePool.length;
+        const workerPage = pagePool[poolSlot];
+
+        const { listingUrl } = candidate;
+        const candidateIndex = candidateBaseIndex + candidateOffset + 1;
+        stats.listingsProcessed += 1;
+
+        emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_STARTED, {
           city,
           index: candidateIndex,
           totalListings: seenListingUrls.size,
           listingUrl,
-          message: error?.message ?? String(error),
         });
-        await jitteredSleep(detailPauseMs);
-      } finally {
-        if (effectiveConcurrency > 1) {
-          await workerPage.close().catch(() => {});
+
+        try {
+          const item = await retry(() => extractListing(workerPage, listingUrl, city, candidate.searchQuery), {
+            retries: retryCount,
+            delayMs: retryDelayMs,
+            label: `extract listing ${candidateIndex}`,
+            onEvent: emit,
+            eventContext: {
+              city,
+              index: candidateIndex,
+              totalListings: seenListingUrls.size,
+              listingUrl,
+            },
+          });
+
+          const listingMatch = scoreListingMatch(item);
+          if (!listingMatch.accepted) {
+            stats.listingsSkipped += 1;
+            emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_SKIPPED, {
+              city,
+              index: candidateIndex,
+              totalListings: seenListingUrls.size,
+              listingUrl,
+              name: item.name ?? null,
+              reason: listingMatch.reason,
+              score: listingMatch.score,
+              positiveSignals: listingMatch.positiveSignals,
+              negativeSignals: listingMatch.negativeSignals,
+            });
+            await jitteredSleep(detailPauseMs);
+            return;
+          }
+
+          results.push(item);
+          stats.listingsAccepted += 1;
+          await jitteredSleep(detailPauseMs);
+        } catch (error) {
+          stats.listingFailures += 1;
+          emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_FAILED, {
+            city,
+            index: candidateIndex,
+            totalListings: seenListingUrls.size,
+            listingUrl,
+            message: error?.message ?? String(error),
+          });
+          await jitteredSleep(detailPauseMs);
         }
+      });
+    } finally {
+      if (effectiveConcurrency > 1) {
+        await Promise.allSettled(pagePool.map((p) => p.close()));
       }
-    });
+    }
   }
 
   return {

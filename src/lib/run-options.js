@@ -138,7 +138,7 @@ function normalizeProxy(input) {
     }
 
     return {
-      server: `${url.protocol}//${url.hostname}${url.port ? ':' + url.port : ''}`,
+      server: `${url.protocol}//${url.host}`,
       username: url.username || undefined,
       password: url.password || undefined,
     };
