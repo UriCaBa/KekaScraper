@@ -97,6 +97,7 @@ export async function scrapeCity(page, detailPage, options) {
     onEvent,
   } = options;
   const emit = typeof onEvent === 'function' ? onEvent : () => {};
+  consentDismissedForContext = false;
 
   const candidateLimit = Math.min(Math.max(resultLimit * 10, resultLimit + 32), 220);
   const searchQueries = buildSearchQueries(queryPrefix, city);
@@ -111,68 +112,67 @@ export async function scrapeCity(page, detailPage, options) {
     listingFailures: 0,
   };
 
-  for (const searchQuery of searchQueries) {
-    if (results.length >= resultLimit || seenListingUrls.size >= candidateLimit) {
-      break;
-    }
-    stats.queriesTried += 1;
+  const effectiveConcurrency = Math.min(Math.max(detailConcurrency, 1), MAX_DETAIL_CONCURRENCY);
+  const context = page.context();
+  const pagePool =
+    effectiveConcurrency > 1
+      ? await Promise.all(Array.from({ length: effectiveConcurrency }, () => context.newPage()))
+      : [detailPage];
+  let nextPoolSlot = 0;
 
-    emitRunEvent(emit, RUN_EVENT_TYPES.CITY_SEARCH_STARTED, {
-      city,
-      searchQuery,
-    });
-
-    await retry(() => openSearchResults(page, searchQuery, coordinates), {
-      retries: retryCount,
-      delayMs: retryDelayMs,
-      label: `open results for ${city}`,
-      onEvent: emit,
-      eventContext: {
-        city,
-        searchQuery,
-      },
-    });
-
-    const listingUrls = await collectListingUrls(page, { candidateLimit, maxScrollRounds });
-    const newCandidates = [];
-    for (const listingUrl of listingUrls) {
-      const key = normalizeMapsUrl(listingUrl);
-      if (!seenListingUrls.has(key)) {
-        const candidate = { listingUrl, searchQuery };
-        seenListingUrls.set(key, candidate);
-        newCandidates.push(candidate);
-      }
-
-      if (seenListingUrls.size >= candidateLimit) {
+  try {
+    for (const searchQuery of searchQueries) {
+      if (results.length >= resultLimit || seenListingUrls.size >= candidateLimit) {
         break;
       }
-    }
+      stats.queriesTried += 1;
 
-    emitRunEvent(emit, RUN_EVENT_TYPES.CITY_SEARCH_RESULTS, {
-      city,
-      searchQuery,
-      candidateCount: listingUrls.length,
-      candidateLimit,
-      aggregatedCandidateCount: seenListingUrls.size,
-    });
-    stats.uniqueCandidates = seenListingUrls.size;
+      emitRunEvent(emit, RUN_EVENT_TYPES.CITY_SEARCH_STARTED, {
+        city,
+        searchQuery,
+      });
 
-    const effectiveConcurrency = Math.min(Math.max(detailConcurrency, 1), MAX_DETAIL_CONCURRENCY);
-    const context = page.context();
-    const candidateBaseIndex = seenListingUrls.size - newCandidates.length;
+      await retry(() => openSearchResults(page, searchQuery, coordinates), {
+        retries: retryCount,
+        delayMs: retryDelayMs,
+        label: `open results for ${city}`,
+        onEvent: emit,
+        eventContext: {
+          city,
+          searchQuery,
+        },
+      });
 
-    // Create a reusable page pool (or use the shared detailPage for concurrency=1)
-    const pagePool =
-      effectiveConcurrency > 1
-        ? await Promise.all(Array.from({ length: effectiveConcurrency }, () => context.newPage()))
-        : [detailPage];
-    let nextPoolSlot = 0;
+      const listingUrls = await collectListingUrls(page, { candidateLimit, maxScrollRounds });
+      const newCandidates = [];
+      for (const listingUrl of listingUrls) {
+        const key = normalizeMapsUrl(listingUrl);
+        if (!seenListingUrls.has(key)) {
+          const candidate = { listingUrl, searchQuery };
+          seenListingUrls.set(key, candidate);
+          newCandidates.push(candidate);
+        }
 
-    // Limit candidates dispatched to avoid exceeding resultLimit under concurrency
-    const remainingSlots = resultLimit - results.length;
-    const cappedCandidates = newCandidates.slice(0, remainingSlots + effectiveConcurrency);
+        if (seenListingUrls.size >= candidateLimit) {
+          break;
+        }
+      }
 
-    try {
+      emitRunEvent(emit, RUN_EVENT_TYPES.CITY_SEARCH_RESULTS, {
+        city,
+        searchQuery,
+        candidateCount: listingUrls.length,
+        candidateLimit,
+        aggregatedCandidateCount: seenListingUrls.size,
+      });
+      stats.uniqueCandidates = seenListingUrls.size;
+
+      const candidateBaseIndex = seenListingUrls.size - newCandidates.length;
+
+      // Limit candidates dispatched to avoid exceeding resultLimit under concurrency
+      const remainingSlots = resultLimit - results.length;
+      const cappedCandidates = newCandidates.slice(0, remainingSlots + effectiveConcurrency);
+
       await mapWithConcurrency(cappedCandidates, effectiveConcurrency, async (candidate, candidateOffset) => {
         if (results.length >= resultLimit) {
           return;
@@ -220,7 +220,7 @@ export async function scrapeCity(page, detailPage, options) {
               positiveSignals: [],
               negativeSignals: ['no-business-fields'],
             });
-            await jitteredSleep(detailPauseMs);
+            await jitteredSleep(200);
             return;
           }
 
@@ -238,7 +238,7 @@ export async function scrapeCity(page, detailPage, options) {
               positiveSignals: listingMatch.positiveSignals,
               negativeSignals: listingMatch.negativeSignals,
             });
-            await jitteredSleep(detailPauseMs);
+            await jitteredSleep(Math.floor(detailPauseMs / 3));
             return;
           }
 
@@ -257,10 +257,10 @@ export async function scrapeCity(page, detailPage, options) {
           await jitteredSleep(detailPauseMs);
         }
       });
-    } finally {
-      if (effectiveConcurrency > 1) {
-        await Promise.allSettled(pagePool.map((p) => p.close()));
-      }
+    }
+  } finally {
+    if (effectiveConcurrency > 1) {
+      await Promise.allSettled(pagePool.map((p) => p.close()));
     }
   }
 
@@ -290,7 +290,13 @@ async function waitForResultsOrDetails(page) {
   });
 }
 
+let consentDismissedForContext = false;
+
 async function dismissConsentIfPresent(page) {
+  if (consentDismissedForContext) {
+    return;
+  }
+
   const patterns = [/accept all/i, /i agree/i, /aceptar todo/i, /rechazar todo/i, /accept/i];
   let dismissed = 0;
   const maxDismissals = 3;
@@ -324,6 +330,10 @@ async function dismissConsentIfPresent(page) {
       break;
     }
   }
+
+  if (dismissed > 0) {
+    consentDismissedForContext = true;
+  }
 }
 
 async function collectListingUrls(page, options) {
@@ -351,7 +361,7 @@ async function collectListingUrls(page, options) {
     }
 
     await scrollResultsPanel(page);
-    await jitteredSleep(1250);
+    await waitForScrollContent(page);
 
     const endOfList = await page
       .locator('[role="feed"] span, div[aria-label*="Results"] span')
@@ -422,6 +432,29 @@ async function scrollResultsPanel(page) {
   }
 
   await page.mouse.wheel(0, 2500);
+}
+
+async function waitForScrollContent(page) {
+  const feed = page.locator('[role="feed"], div[aria-label*="Results"]').first();
+  if (!(await feed.count())) {
+    await jitteredSleep(800);
+    return;
+  }
+
+  const initialHeight = await feed.evaluate((node) => node.scrollHeight).catch(() => 0);
+  const maxWait = 2000;
+  const pollInterval = 200;
+  let elapsed = 0;
+
+  while (elapsed < maxWait) {
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    elapsed += pollInterval;
+    const currentHeight = await feed.evaluate((node) => node.scrollHeight).catch(() => 0);
+    if (currentHeight > initialHeight) {
+      await jitteredSleep(200);
+      return;
+    }
+  }
 }
 
 async function extractListing(page, listingUrl, city, searchQuery) {
@@ -689,12 +722,12 @@ function cueMatchesCity(cue, cityMatchers) {
     return true;
   }
 
-  const cueTokens = cue.split(/\s+/).filter(Boolean);
+  const cueTokenSet = new Set(cue.split(/\s+/).filter(Boolean));
   if (cityMatchers.tokens.length === 1) {
-    return cueTokens.includes(cityMatchers.tokens[0]);
+    return cueTokenSet.has(cityMatchers.tokens[0]);
   }
 
-  return cityMatchers.tokens.every((token) => cueTokens.includes(token));
+  return cityMatchers.tokens.every((token) => cueTokenSet.has(token));
 }
 
 function extractAddressLocationCues(value) {

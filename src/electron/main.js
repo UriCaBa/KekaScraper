@@ -89,7 +89,7 @@ function registerIpcHandlers() {
       formState: initialFormState,
       outputDirectory: getDesktopOutputDirectory(),
       supportsBundledChromium: !app.isPackaged,
-      appVersion: app.getVersion(),
+      appVersion: defaultConfig.appVersion,
     };
   });
 
