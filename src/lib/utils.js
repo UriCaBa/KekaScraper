@@ -44,6 +44,29 @@ export async function ensureDir(dirPath) {
   await fs.mkdir(dirPath, { recursive: true });
 }
 
+export async function atomicWriteJson(filePath, data) {
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  await fs.writeFile(tmpPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+
+  try {
+    await fs.rename(tmpPath, filePath);
+  } catch (error) {
+    if (error && (error.code === 'EEXIST' || error.code === 'EPERM')) {
+      try {
+        await fs.rm(filePath, { force: true });
+        await fs.rename(tmpPath, filePath);
+        return;
+      } catch {
+        await fs.copyFile(tmpPath, filePath);
+        await fs.rm(tmpPath, { force: true });
+        return;
+      }
+    }
+    await fs.rm(tmpPath, { force: true }).catch(() => {});
+    throw error;
+  }
+}
+
 export async function mapWithConcurrency(items, concurrency, mapper) {
   const targetConcurrency = Math.max(1, Number.parseInt(concurrency, 10) || 1);
   const results = new Array(items.length);

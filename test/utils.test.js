@@ -29,6 +29,36 @@ export const tests = [
     },
   },
   {
+    name: 'mapWithConcurrency actually runs tasks in parallel when concurrency > 1',
+    run: async () => {
+      const timeline = [];
+      let allowTask0Resolve;
+      const allowTask0 = new Promise((resolve) => {
+        allowTask0Resolve = resolve;
+      });
+
+      const work = mapWithConcurrency([0, 1, 2], 3, async (_, index) => {
+        timeline.push({ index, event: 'start' });
+        if (index === 0) {
+          await allowTask0;
+        }
+        if (index === 1) {
+          allowTask0Resolve();
+        }
+        timeline.push({ index, event: 'end' });
+      });
+
+      await Promise.race([
+        work,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Parallelism timeout')), 2000)),
+      ]);
+
+      const task0End = timeline.findIndex((e) => e.index === 0 && e.event === 'end');
+      const task1Start = timeline.findIndex((e) => e.index === 1 && e.event === 'start');
+      assert.ok(task1Start < task0End, 'Task 1 should start before task 0 ends (parallel execution)');
+    },
+  },
+  {
     name: 'parseNumber rejects decimal values and handles thousands separators',
     run: () => {
       assert.equal(parseNumber('4,5'), null);

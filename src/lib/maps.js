@@ -1,4 +1,4 @@
-import { firstNonEmpty, parseRatingAndReviews, retry, stripFieldPrefix } from './utils.js';
+import { firstNonEmpty, mapWithConcurrency, parseRatingAndReviews, retry, stripFieldPrefix } from './utils.js';
 import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
 import { jitteredSleep } from './stealth.js';
 
@@ -81,6 +81,8 @@ const STREET_TOKENS = new Set([
   'way',
 ]);
 
+export const MAX_DETAIL_CONCURRENCY = 3;
+
 export async function scrapeCity(page, detailPage, options) {
   const {
     city,
@@ -90,6 +92,7 @@ export async function scrapeCity(page, detailPage, options) {
     retryCount,
     retryDelayMs,
     detailPauseMs,
+    detailConcurrency = 1,
     coordinates,
     onEvent,
   } = options;
@@ -154,68 +157,92 @@ export async function scrapeCity(page, detailPage, options) {
     });
     stats.uniqueCandidates = seenListingUrls.size;
 
-    for (let candidateOffset = 0; candidateOffset < newCandidates.length; candidateOffset += 1) {
-      if (results.length >= resultLimit) {
-        break;
-      }
+    const effectiveConcurrency = Math.min(Math.max(detailConcurrency, 1), MAX_DETAIL_CONCURRENCY);
+    const context = page.context();
+    const candidateBaseIndex = seenListingUrls.size - newCandidates.length;
 
-      const candidate = newCandidates[candidateOffset];
-      const { listingUrl } = candidate;
-      const candidateIndex = seenListingUrls.size - newCandidates.length + candidateOffset + 1;
-      stats.listingsProcessed += 1;
+    // Create a reusable page pool (or use the shared detailPage for concurrency=1)
+    const pagePool =
+      effectiveConcurrency > 1
+        ? await Promise.all(Array.from({ length: effectiveConcurrency }, () => context.newPage()))
+        : [detailPage];
+    let nextPoolSlot = 0;
 
-      emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_STARTED, {
-        city,
-        index: candidateIndex,
-        totalListings: seenListingUrls.size,
-        listingUrl,
-      });
+    // Limit candidates dispatched to avoid exceeding resultLimit under concurrency
+    const remainingSlots = resultLimit - results.length;
+    const cappedCandidates = newCandidates.slice(0, remainingSlots + effectiveConcurrency);
 
-      try {
-        const item = await retry(() => extractListing(detailPage, listingUrl, city, candidate.searchQuery), {
-          retries: retryCount,
-          delayMs: retryDelayMs,
-          label: `extract listing ${candidateIndex}`,
-          onEvent: emit,
-          eventContext: {
-            city,
-            index: candidateIndex,
-            totalListings: seenListingUrls.size,
-            listingUrl,
-          },
-        });
-
-        const listingMatch = scoreListingMatch(item);
-        if (!listingMatch.accepted) {
-          stats.listingsSkipped += 1;
-          emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_SKIPPED, {
-            city,
-            index: candidateIndex,
-            totalListings: seenListingUrls.size,
-            listingUrl,
-            name: item.name ?? null,
-            reason: listingMatch.reason,
-            score: listingMatch.score,
-            positiveSignals: listingMatch.positiveSignals,
-            negativeSignals: listingMatch.negativeSignals,
-          });
-          await jitteredSleep(detailPauseMs);
-          continue;
+    try {
+      await mapWithConcurrency(cappedCandidates, effectiveConcurrency, async (candidate, candidateOffset) => {
+        if (results.length >= resultLimit) {
+          return;
         }
 
-        results.push(item);
-        stats.listingsAccepted += 1;
-        await jitteredSleep(detailPauseMs);
-      } catch (error) {
-        stats.listingFailures += 1;
-        emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_FAILED, {
+        const poolSlot = nextPoolSlot;
+        nextPoolSlot = (nextPoolSlot + 1) % pagePool.length;
+        const workerPage = pagePool[poolSlot];
+
+        const { listingUrl } = candidate;
+        const candidateIndex = candidateBaseIndex + candidateOffset + 1;
+        stats.listingsProcessed += 1;
+
+        emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_STARTED, {
           city,
           index: candidateIndex,
           totalListings: seenListingUrls.size,
           listingUrl,
-          message: error?.message ?? String(error),
         });
-        await jitteredSleep(detailPauseMs);
+
+        try {
+          const item = await retry(() => extractListing(workerPage, listingUrl, city, candidate.searchQuery), {
+            retries: retryCount,
+            delayMs: retryDelayMs,
+            label: `extract listing ${candidateIndex}`,
+            onEvent: emit,
+            eventContext: {
+              city,
+              index: candidateIndex,
+              totalListings: seenListingUrls.size,
+              listingUrl,
+            },
+          });
+
+          const listingMatch = scoreListingMatch(item);
+          if (!listingMatch.accepted) {
+            stats.listingsSkipped += 1;
+            emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_SKIPPED, {
+              city,
+              index: candidateIndex,
+              totalListings: seenListingUrls.size,
+              listingUrl,
+              name: item.name ?? null,
+              reason: listingMatch.reason,
+              score: listingMatch.score,
+              positiveSignals: listingMatch.positiveSignals,
+              negativeSignals: listingMatch.negativeSignals,
+            });
+            await jitteredSleep(detailPauseMs);
+            return;
+          }
+
+          results.push(item);
+          stats.listingsAccepted += 1;
+          await jitteredSleep(detailPauseMs);
+        } catch (error) {
+          stats.listingFailures += 1;
+          emitRunEvent(emit, RUN_EVENT_TYPES.LISTING_FAILED, {
+            city,
+            index: candidateIndex,
+            totalListings: seenListingUrls.size,
+            listingUrl,
+            message: error?.message ?? String(error),
+          });
+          await jitteredSleep(detailPauseMs);
+        }
+      });
+    } finally {
+      if (effectiveConcurrency > 1) {
+        await Promise.allSettled(pagePool.map((p) => p.close()));
       }
     }
   }

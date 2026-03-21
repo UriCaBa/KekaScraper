@@ -44,6 +44,10 @@ export function normalizeRunOptions(input = {}, { requireCities = true } = {}) {
     headless: normalizeBoolean(input.headless, defaultConfig.headless),
     enrichWebsite: normalizeBoolean(input.enrichWebsite, defaultConfig.enrichWebsite),
     coordinates: normalizeCoordinates(input),
+    proxy: normalizeProxy(input),
+    resume: normalizeBoolean(input.resume, false),
+    concurrency: normalizeInteger(input.concurrency, 1, 'concurrency', { min: 1 }),
+    detailConcurrency: normalizeInteger(input.detailConcurrency, 1, 'detailConcurrency', { min: 1 }),
   };
 }
 
@@ -119,6 +123,29 @@ function normalizeCoordinates(input) {
     throw new Error(`Zoom must be an integer between 1 and 21, got ${input.zoom}`);
   }
   return { lat, lng, zoom };
+}
+
+function normalizeProxy(input) {
+  const raw = input.proxy;
+  if (!raw || (typeof raw === 'string' && !raw.trim())) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:' && url.protocol !== 'socks5:') {
+      throw new Error('Proxy protocol must be http, https, or socks5');
+    }
+
+    return {
+      server: `${url.protocol}//${url.host}`,
+      username: url.username || undefined,
+      password: url.password || undefined,
+    };
+  } catch (error) {
+    if (error.message.includes('Proxy protocol')) throw error;
+    throw new Error(`Invalid proxy URL: ${raw}`, { cause: error });
+  }
 }
 
 function normalizeCities(value) {

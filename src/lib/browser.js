@@ -10,6 +10,7 @@ export async function launchBrowser(options) {
     navigationTimeoutMs,
     actionTimeoutMs,
     allowBundledChromium = true,
+    proxy,
   } = options;
 
   let browser;
@@ -31,6 +32,7 @@ export async function launchBrowser(options) {
         headless,
         slowMo,
         args: [...(candidate.launchOptions.args ?? []), ...getStealthLaunchArgs()],
+        ...(proxy ? { proxy: { server: proxy.server, username: proxy.username, password: proxy.password } } : {}),
       });
       selectedLaunchCandidate = candidate;
       break;

@@ -159,6 +159,21 @@ function parseArgs(argv) {
         options.zoom = parseInteger(expectValue(argv, index, arg), arg, { min: 1, max: 21 });
         index += 1;
         break;
+      case '--proxy':
+        options.proxy = expectValue(argv, index, arg);
+        index += 1;
+        break;
+      case '--resume':
+        options.resume = true;
+        break;
+      case '--concurrency':
+        options.concurrency = parseInteger(expectValue(argv, index, arg), arg, { min: 1 });
+        index += 1;
+        break;
+      case '--detail-concurrency':
+        options.detailConcurrency = parseInteger(expectValue(argv, index, arg), arg, { min: 1 });
+        index += 1;
+        break;
       default:
         if (arg.startsWith('-')) {
           throw new Error(`Unknown argument: ${arg}`);
@@ -221,6 +236,10 @@ Options:
   --lat 41.3874            Latitude for geo-targeted search
   --lng 2.1686             Longitude for geo-targeted search
   --zoom 15                Zoom level for geo-targeting (1-21, default 15)
+  --proxy "http://u:p@host:port"  Route traffic through a proxy
+  --resume                 Resume the last interrupted run
+  --concurrency 3          Process N cities in parallel (default 1)
+  --detail-concurrency 3   Extract N listings in parallel within a city (default 1, max 3)
   --help                   Show this help
 `);
 }
