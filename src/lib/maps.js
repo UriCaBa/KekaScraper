@@ -82,7 +82,17 @@ const STREET_TOKENS = new Set([
 ]);
 
 export async function scrapeCity(page, detailPage, options) {
-  const { city, queryPrefix, resultLimit, maxScrollRounds, retryCount, retryDelayMs, detailPauseMs, onEvent } = options;
+  const {
+    city,
+    queryPrefix,
+    resultLimit,
+    maxScrollRounds,
+    retryCount,
+    retryDelayMs,
+    detailPauseMs,
+    coordinates,
+    onEvent,
+  } = options;
   const emit = typeof onEvent === 'function' ? onEvent : () => {};
 
   const candidateLimit = Math.min(Math.max(resultLimit * 10, resultLimit + 32), 220);
@@ -109,7 +119,7 @@ export async function scrapeCity(page, detailPage, options) {
       searchQuery,
     });
 
-    await retry(() => openSearchResults(page, searchQuery), {
+    await retry(() => openSearchResults(page, searchQuery, coordinates), {
       retries: retryCount,
       delayMs: retryDelayMs,
       label: `open results for ${city}`,
@@ -216,8 +226,12 @@ export async function scrapeCity(page, detailPage, options) {
   };
 }
 
-async function openSearchResults(page, searchQuery) {
-  const searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}`;
+async function openSearchResults(page, searchQuery, coordinates) {
+  let searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}`;
+  if (coordinates?.lat != null && coordinates?.lng != null) {
+    const zoom = coordinates.zoom ?? 15;
+    searchUrl += `/@${coordinates.lat},${coordinates.lng},${zoom}z`;
+  }
   await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
   await dismissConsentIfPresent(page);
   await waitForResultsOrDetails(page);
@@ -294,6 +308,15 @@ async function collectListingUrls(page, options) {
 
     await scrollResultsPanel(page);
     await jitteredSleep(1250);
+
+    const endOfList = await page
+      .locator('[role="feed"] span, div[aria-label*="Results"] span')
+      .filter({ hasText: /You[''\u2019]ve reached the end|Has llegado al final/i })
+      .count()
+      .catch(() => 0);
+    if (endOfList > 0) {
+      break;
+    }
 
     if (seen.size === previousCount) {
       stagnantRounds += 1;
@@ -404,7 +427,7 @@ async function extractListing(page, listingUrl, city, searchQuery) {
     };
 
     return {
-      name: pickText(['h1']),
+      name: pickText(['h1']) || document.title.replace(/\s*[-\u2013]\s*Google Maps.*$/i, '').trim(),
       ratingText:
         pickAria(['span[role="img"][aria-label]', 'div[role="img"][aria-label]']) ||
         pickText([
@@ -419,8 +442,8 @@ async function extractListing(page, listingUrl, city, searchQuery) {
         'button[aria-label*="rese"]',
       ]),
       category: pickText([
-        'button[jsaction*="pane.rating.category"]',
         'button[aria-label*="Category"]',
+        'button[jsaction*="pane.rating.category"]',
         'button[aria-label*="Hotel"]',
         'button[aria-label*="Hostel"]',
       ]),
@@ -765,7 +788,7 @@ async function waitForListingSignals(page) {
       .first()
       .waitFor({ state: 'visible', timeout: 5000 }),
     page
-      .locator('button[jsaction*="pane.rating.category"], button[aria-label*="Category"]')
+      .locator('button[aria-label*="Category"], button[jsaction*="pane.rating.category"]')
       .first()
       .waitFor({ state: 'visible', timeout: 5000 }),
   ]).catch(() => {});

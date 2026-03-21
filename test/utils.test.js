@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 
-import { mapWithConcurrency, parseNumber, parseRatingAndReviews, retry } from '../src/lib/utils.js';
+import {
+  firstNonEmpty,
+  mapWithConcurrency,
+  normalizeWhitespace,
+  parseNumber,
+  parseRating,
+  parseRatingAndReviews,
+  retry,
+  stripFieldPrefix,
+  toCsv,
+  uniqueNonEmpty,
+} from '../src/lib/utils.js';
 
 export const tests = [
   {
@@ -67,6 +78,153 @@ export const tests = [
           ),
         { message: 'always-fail' },
       );
+    },
+  },
+  // --- normalizeWhitespace ---
+  {
+    name: 'normalizeWhitespace collapses multiple spaces',
+    run: () => {
+      assert.equal(normalizeWhitespace('  hello   world  '), 'hello world');
+    },
+  },
+  {
+    name: 'normalizeWhitespace returns empty string for non-string input',
+    run: () => {
+      assert.equal(normalizeWhitespace(null), '');
+      assert.equal(normalizeWhitespace(42), '');
+    },
+  },
+  {
+    name: 'normalizeWhitespace handles tabs and newlines',
+    run: () => {
+      assert.equal(normalizeWhitespace('hello\t\nworld'), 'hello world');
+    },
+  },
+  // --- firstNonEmpty ---
+  {
+    name: 'firstNonEmpty returns first non-empty string',
+    run: () => {
+      assert.equal(firstNonEmpty('', null, 'hello', 'world'), 'hello');
+    },
+  },
+  {
+    name: 'firstNonEmpty returns null when all empty',
+    run: () => {
+      assert.equal(firstNonEmpty('', null, undefined), null);
+    },
+  },
+  {
+    name: 'firstNonEmpty normalizes whitespace on returned value',
+    run: () => {
+      assert.equal(firstNonEmpty('  spaced  '), 'spaced');
+    },
+  },
+  {
+    name: 'firstNonEmpty returns non-string truthy values',
+    run: () => {
+      assert.equal(firstNonEmpty(null, '', 42), 42);
+    },
+  },
+  // --- stripFieldPrefix ---
+  {
+    name: 'stripFieldPrefix strips Address prefix',
+    run: () => {
+      assert.equal(stripFieldPrefix('Address: 123 Main St'), '123 Main St');
+    },
+  },
+  {
+    name: 'stripFieldPrefix strips Spanish prefix',
+    run: () => {
+      assert.equal(stripFieldPrefix('Dirección: Calle Mayor'), 'Calle Mayor');
+    },
+  },
+  {
+    name: 'stripFieldPrefix strips Website prefix',
+    run: () => {
+      assert.equal(stripFieldPrefix('Website: example.com'), 'example.com');
+    },
+  },
+  {
+    name: 'stripFieldPrefix strips Phone prefix',
+    run: () => {
+      assert.equal(stripFieldPrefix('Phone: +34 123'), '+34 123');
+    },
+  },
+  {
+    name: 'stripFieldPrefix returns null for falsy input',
+    run: () => {
+      assert.equal(stripFieldPrefix(null), null);
+      assert.equal(stripFieldPrefix(''), null);
+    },
+  },
+  // --- uniqueNonEmpty ---
+  {
+    name: 'uniqueNonEmpty deduplicates and filters empty values',
+    run: () => {
+      assert.deepEqual(uniqueNonEmpty(['hello', 'world', 'hello', '']), ['hello', 'world']);
+    },
+  },
+  {
+    name: 'uniqueNonEmpty normalizes whitespace before deduplication',
+    run: () => {
+      assert.deepEqual(uniqueNonEmpty(['  a  ', 'a']), ['a']);
+    },
+  },
+  // --- toCsv ---
+  {
+    name: 'toCsv returns empty string for empty array',
+    run: () => {
+      assert.equal(toCsv([]), '');
+    },
+  },
+  {
+    name: 'toCsv generates headers from object keys',
+    run: () => {
+      assert.equal(toCsv([{ a: 1, b: 2 }]), 'a,b\n1,2');
+    },
+  },
+  {
+    name: 'toCsv escapes values with commas',
+    run: () => {
+      assert.equal(toCsv([{ name: 'a,b' }]), 'name\n"a,b"');
+    },
+  },
+  {
+    name: 'toCsv escapes values with quotes',
+    run: () => {
+      assert.equal(toCsv([{ name: 'say "hi"' }]), 'name\n"say ""hi"""');
+    },
+  },
+  {
+    name: 'toCsv handles null and undefined values',
+    run: () => {
+      assert.equal(toCsv([{ a: null, b: undefined }]), 'a,b\n,');
+    },
+  },
+  {
+    name: 'toCsv merges headers from multiple rows',
+    run: () => {
+      assert.equal(toCsv([{ a: 1 }, { b: 2 }]), 'a,b\n1,\n,2');
+    },
+  },
+  // --- parseRating ---
+  {
+    name: 'parseRating parses decimal rating',
+    run: () => {
+      assert.equal(parseRating('4.5'), 4.5);
+    },
+  },
+  {
+    name: 'parseRating parses comma decimal rating',
+    run: () => {
+      assert.equal(parseRating('4,5'), 4.5);
+    },
+  },
+  {
+    name: 'parseRating returns null for empty input',
+    run: () => {
+      assert.equal(parseRating(''), null);
+      assert.equal(parseRating(null), null);
     },
   },
 ];

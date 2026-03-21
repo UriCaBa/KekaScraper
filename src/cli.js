@@ -145,6 +145,20 @@ function parseArgs(argv) {
         options.websitePageLimit = parseInteger(expectValue(argv, index, arg), arg);
         index += 1;
         break;
+      case '--lat':
+        options.lat = parseFloat(expectValue(argv, index, arg));
+        if (Number.isNaN(options.lat)) throw new Error('--lat must be a number');
+        index += 1;
+        break;
+      case '--lng':
+        options.lng = parseFloat(expectValue(argv, index, arg));
+        if (Number.isNaN(options.lng)) throw new Error('--lng must be a number');
+        index += 1;
+        break;
+      case '--zoom':
+        options.zoom = parseInteger(expectValue(argv, index, arg), arg, { min: 1, max: 21 });
+        index += 1;
+        break;
       default:
         if (arg.startsWith('-')) {
           throw new Error(`Unknown argument: ${arg}`);
@@ -204,6 +218,9 @@ Options:
   --enrich                 Enrich from the official website
   --no-enrich              Skip website enrichment
   --website-page-limit 8   Max same-domain pages to scan
+  --lat 41.3874            Latitude for geo-targeted search
+  --lng 2.1686             Longitude for geo-targeted search
+  --zoom 15                Zoom level for geo-targeting (1-21, default 15)
   --help                   Show this help
 `);
 }
