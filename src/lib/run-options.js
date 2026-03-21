@@ -102,6 +102,10 @@ function normalizeCoordinates(input) {
     throw new Error('Both --lat and --lng must be provided together.');
   }
 
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error(`Latitude and longitude must be valid numbers, got lat=${input.lat}, lng=${input.lng}`);
+  }
+
   if (lat < -90 || lat > 90) {
     throw new Error(`Latitude must be between -90 and 90, got ${lat}`);
   }
@@ -111,6 +115,9 @@ function normalizeCoordinates(input) {
   }
 
   const zoom = input.zoom != null ? Number.parseInt(input.zoom, 10) : 15;
+  if (!Number.isFinite(zoom) || zoom < 1 || zoom > 21) {
+    throw new Error(`Zoom must be an integer between 1 and 21, got ${input.zoom}`);
+  }
   return { lat, lng, zoom };
 }
 

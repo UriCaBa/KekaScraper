@@ -82,8 +82,17 @@ const STREET_TOKENS = new Set([
 ]);
 
 export async function scrapeCity(page, detailPage, options) {
-  const { city, queryPrefix, resultLimit, maxScrollRounds, retryCount, retryDelayMs, detailPauseMs, coordinates, onEvent } =
-    options;
+  const {
+    city,
+    queryPrefix,
+    resultLimit,
+    maxScrollRounds,
+    retryCount,
+    retryDelayMs,
+    detailPauseMs,
+    coordinates,
+    onEvent,
+  } = options;
   const emit = typeof onEvent === 'function' ? onEvent : () => {};
 
   const candidateLimit = Math.min(Math.max(resultLimit * 10, resultLimit + 32), 220);

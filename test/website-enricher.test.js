@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 
-import { getEnrichmentCacheKey, extractEmails, extractSocialLinks, extractAnchors } from '../src/lib/website-enricher.js';
+import {
+  getEnrichmentCacheKey,
+  extractEmails,
+  extractSocialLinks,
+  extractAnchors,
+} from '../src/lib/website-enricher.js';
 
 export const tests = [
   {
@@ -94,9 +99,9 @@ export const tests = [
     run: () => {
       const html = '<a href="javascript:void(0)">Bad</a><a href="/good">Good</a>';
       const anchors = extractAnchors(html, 'https://example.com');
-      // javascript: URLs should still parse as relative, only truly malformed ones are skipped
+      // javascript: URLs may still be included; this test ensures malformed URLs are skipped and the valid relative link is kept
       assert.ok(anchors.length >= 1);
-      assert.ok(anchors.some(a => a.url === 'https://example.com/good'));
+      assert.ok(anchors.some((a) => a.url === 'https://example.com/good'));
     },
   },
   {

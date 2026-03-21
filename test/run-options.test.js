@@ -61,7 +61,10 @@ export const tests = [
   {
     name: 'normalizeRunOptions accepts custom zoom level',
     run: () => {
-      const result = normalizeRunOptions({ cities: 'Barcelona', lat: 41.3874, lng: 2.1686, zoom: 18 }, { requireCities: true });
+      const result = normalizeRunOptions(
+        { cities: 'Barcelona', lat: 41.3874, lng: 2.1686, zoom: 18 },
+        { requireCities: true },
+      );
       assert.equal(result.coordinates.zoom, 18);
     },
   },
@@ -96,6 +99,28 @@ export const tests = [
       assert.throws(
         () => normalizeRunOptions({ cities: 'Barcelona', lat: 41, lng: 181 }, { requireCities: true }),
         /Longitude must be between -180 and 180/,
+      );
+    },
+  },
+  {
+    name: 'normalizeRunOptions throws for non-numeric lat/lng values',
+    run: () => {
+      assert.throws(
+        () => normalizeRunOptions({ cities: 'Barcelona', lat: 'abc', lng: 'xyz' }, { requireCities: true }),
+        /Latitude and longitude must be valid numbers/,
+      );
+    },
+  },
+  {
+    name: 'normalizeRunOptions throws for invalid zoom value',
+    run: () => {
+      assert.throws(
+        () => normalizeRunOptions({ cities: 'Barcelona', lat: 41, lng: 2, zoom: 'bad' }, { requireCities: true }),
+        /Zoom must be an integer between 1 and 21/,
+      );
+      assert.throws(
+        () => normalizeRunOptions({ cities: 'Barcelona', lat: 41, lng: 2, zoom: 25 }, { requireCities: true }),
+        /Zoom must be an integer between 1 and 21/,
       );
     },
   },
