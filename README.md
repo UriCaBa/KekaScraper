@@ -182,6 +182,7 @@ npm run smoke:electron
 - `--proxy "http://user:pass@host:port"` Route all browser traffic through a proxy
 - `--resume` Resume the last interrupted run from its checkpoint
 - `--concurrency 3` Process N cities in parallel (default 1)
+- `--detail-concurrency 3` Extract N listings in parallel within a city (default 1, max 3)
 
 ## Notes and limits
 

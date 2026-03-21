@@ -29,6 +29,30 @@ export const tests = [
     },
   },
   {
+    name: 'mapWithConcurrency actually runs tasks in parallel when concurrency > 1',
+    run: async () => {
+      const timeline = [];
+      const tasks = [50, 50, 50, 50];
+
+      const startTime = Date.now();
+      await mapWithConcurrency(tasks, 3, async (delayMs, index) => {
+        timeline.push({ index, event: 'start', at: Date.now() - startTime });
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        timeline.push({ index, event: 'end', at: Date.now() - startTime });
+      });
+      const totalTime = Date.now() - startTime;
+
+      // With concurrency=3, 4 tasks of 50ms each should take ~100ms (2 rounds), not ~200ms (4 rounds)
+      assert.ok(totalTime < 180, `Expected <180ms for parallel execution, got ${totalTime}ms`);
+
+      // At least 2 tasks should have started before any ended
+      const startEvents = timeline.filter((e) => e.event === 'start');
+      const firstEnd = timeline.find((e) => e.event === 'end');
+      const startsBeforeFirstEnd = startEvents.filter((e) => e.at <= firstEnd.at).length;
+      assert.ok(startsBeforeFirstEnd >= 2, `Expected >=2 tasks started before first end, got ${startsBeforeFirstEnd}`);
+    },
+  },
+  {
     name: 'parseNumber rejects decimal values and handles thousands separators',
     run: () => {
       assert.equal(parseNumber('4,5'), null);

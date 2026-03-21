@@ -322,9 +322,6 @@ button.secondary:hover:not(:disabled) {
   border: 1px solid var(--panel-border);
   color: var(--ink-secondary);
   padding: 16px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
 }
 
 .status-panel {
@@ -393,7 +390,7 @@ button.secondary:hover:not(:disabled) {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 920px;
+  table-layout: fixed;
 }
 
 th,
@@ -401,7 +398,6 @@ td {
   padding: 14px 16px;
   text-align: left;
   border-bottom: 1px solid var(--table-border);
-  vertical-align: top;
 }
 
 th {
@@ -414,6 +410,12 @@ th {
 
 tr:nth-child(even) td {
   background: var(--table-row-alt);
+}
+
+td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 td a {

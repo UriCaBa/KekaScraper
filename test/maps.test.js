@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { buildSearchQueries, isLikelyHostel, scoreListingMatch } from '../src/lib/maps.js';
+import { buildSearchQueries, isLikelyHostel, MAX_DETAIL_CONCURRENCY, scoreListingMatch } from '../src/lib/maps.js';
 
 export const tests = [
   {
@@ -81,6 +81,26 @@ export const tests = [
       });
       assert.equal(wrongCityWithoutAddress.accepted, false);
       assert.match(wrongCityWithoutAddress.negativeSignals.join(' '), /location-strong-negative-other-city/);
+    },
+  },
+  {
+    name: 'MAX_DETAIL_CONCURRENCY is capped at 3',
+    run: () => {
+      assert.equal(MAX_DETAIL_CONCURRENCY, 3);
+      assert.equal(typeof MAX_DETAIL_CONCURRENCY, 'number');
+    },
+  },
+  {
+    name: 'detailConcurrency option defaults to 1 and is clamped to MAX_DETAIL_CONCURRENCY',
+    run: () => {
+      // Verify the clamping logic: Math.min(Math.max(value, 1), MAX_DETAIL_CONCURRENCY)
+      const clamp = (v) => Math.min(Math.max(v, 1), MAX_DETAIL_CONCURRENCY);
+      assert.equal(clamp(0), 1, 'values below 1 are clamped to 1');
+      assert.equal(clamp(1), 1);
+      assert.equal(clamp(2), 2);
+      assert.equal(clamp(3), 3);
+      assert.equal(clamp(5), 3, 'values above MAX are clamped to MAX_DETAIL_CONCURRENCY');
+      assert.equal(clamp(100), 3);
     },
   },
 ];

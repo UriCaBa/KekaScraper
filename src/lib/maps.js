@@ -81,7 +81,7 @@ const STREET_TOKENS = new Set([
   'way',
 ]);
 
-const MAX_DETAIL_CONCURRENCY = 3;
+export const MAX_DETAIL_CONCURRENCY = 3;
 
 export async function scrapeCity(page, detailPage, options) {
   const {
