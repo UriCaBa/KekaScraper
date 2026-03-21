@@ -97,7 +97,6 @@ export async function scrapeCity(page, detailPage, options) {
     onEvent,
   } = options;
   const emit = typeof onEvent === 'function' ? onEvent : () => {};
-  consentDismissedForContext = false;
 
   const candidateLimit = Math.min(Math.max(resultLimit * 10, resultLimit + 32), 220);
   const searchQueries = buildSearchQueries(queryPrefix, city);
@@ -114,10 +113,13 @@ export async function scrapeCity(page, detailPage, options) {
 
   const effectiveConcurrency = Math.min(Math.max(detailConcurrency, 1), MAX_DETAIL_CONCURRENCY);
   const context = page.context();
-  const pagePool =
-    effectiveConcurrency > 1
-      ? await Promise.all(Array.from({ length: effectiveConcurrency }, () => context.newPage()))
-      : [detailPage];
+  let pagePool;
+  if (effectiveConcurrency > 1) {
+    const extraPages = await Promise.all(Array.from({ length: effectiveConcurrency - 1 }, () => context.newPage()));
+    pagePool = [detailPage, ...extraPages];
+  } else {
+    pagePool = [detailPage];
+  }
   let nextPoolSlot = 0;
 
   try {

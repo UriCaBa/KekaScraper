@@ -46,7 +46,7 @@ const CONTACT_KEYWORDS = [
   'who-we-are',
 ];
 
-const CONTACT_KEYWORDS_REGEX = new RegExp(CONTACT_KEYWORDS.join('|'), 'i');
+const CONTACT_KEYWORDS_REGEX_GLOBAL = new RegExp(CONTACT_KEYWORDS.join('|'), 'gi');
 
 const ROLE_WORDS = [
   'owner',
@@ -313,7 +313,7 @@ async function fetchHtmlPage(url, options) {
       lines,
       hasForm: /<form\b/i.test(html),
       anchors: extractAnchors(html, response.url),
-      emails: mergeEmailSources(extractEmails(html), extractEmails(lines.join(' '))),
+      emails: mergeEmailSources(extractEmails(html), extractEmails(lines.join(' ')), extractMailtoEmails(html)),
       phones: extractPhones(lines.join(' ')),
     };
   } finally {
@@ -620,8 +620,8 @@ function scoreAnchors(baseUrl, anchors) {
       }
 
       const url = target.toString();
-      const haystack = `${url} ${anchor.text ?? ''}`;
-      const keywordScore = CONTACT_KEYWORDS_REGEX.test(haystack) ? 1 : 0;
+      const haystack = `${url} ${anchor.text ?? ''}`.toLowerCase();
+      const keywordScore = (haystack.match(CONTACT_KEYWORDS_REGEX_GLOBAL) ?? []).length;
       const score = keywordScore * 10 + scoreByPath(url);
 
       const current = byUrl.get(url);
