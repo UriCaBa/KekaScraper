@@ -164,7 +164,7 @@ async function enrichFromWebsite(listing, options, hooks = {}) {
 
   const homepage = await fetchHtmlPage(homepageUrl, options);
   const websiteDomain = new URL(homepage.finalUrl).hostname.replace(/^www\./i, '');
-  const scannedPages = await crawlWebsite(homepage, options, hooks.onEvent);
+  const { scannedPages, socialLinks } = await crawlWebsite(homepage, options, hooks.onEvent);
   const candidatePages = scannedPages.slice(1).map((page) => page.finalUrl);
   const emailCandidates = buildEmailCandidates(scannedPages, websiteDomain, listing);
   const allPhones = uniqueNonEmpty(scannedPages.flatMap((page) => page.phones));
@@ -211,6 +211,12 @@ async function enrichFromWebsite(listing, options, hooks = {}) {
     websiteScanStatus: 'ok',
     websitePagesScanned: scannedPages.length,
     websiteScannedUrls: scannedPages.map((page) => page.finalUrl).join(' | '),
+    instagramUrl: socialLinks.instagramUrl,
+    facebookUrl: socialLinks.facebookUrl,
+    linkedinUrl: socialLinks.linkedinUrl,
+    twitterUrl: socialLinks.twitterUrl,
+    tiktokUrl: socialLinks.tiktokUrl,
+    youtubeUrl: socialLinks.youtubeUrl,
   };
 }
 
@@ -249,6 +255,12 @@ function withDefaultEnrichment(listing, overrides = {}) {
     websiteScanStatus: listing.website ? 'skipped' : 'no-website',
     websitePagesScanned: 0,
     websiteScannedUrls: null,
+    instagramUrl: null,
+    facebookUrl: null,
+    linkedinUrl: null,
+    twitterUrl: null,
+    tiktokUrl: null,
+    youtubeUrl: null,
     ...overrides,
   };
 }
@@ -311,6 +323,7 @@ async function crawlWebsite(homepage, options, onEvent = () => {}) {
   const maxPages = Math.max(1, options.websitePageLimit);
   const visited = new Set([normalizePageKey(homepage.finalUrl)]);
   const scannedPages = [homepage];
+  const socialLinks = extractSocialLinks(homepage.anchors);
   const queue = scoreAnchors(homepage.finalUrl, homepage.anchors);
 
   while (scannedPages.length < maxPages && queue.length) {
@@ -331,6 +344,7 @@ async function crawlWebsite(homepage, options, onEvent = () => {}) {
     try {
       const page = await fetchHtmlPage(next.url, options);
       scannedPages.push(page);
+      mergeSocialLinks(socialLinks, extractSocialLinks(page.anchors));
 
       const finalKey = normalizePageKey(page.finalUrl);
       if (finalKey !== pageKey) {
@@ -351,7 +365,7 @@ async function crawlWebsite(homepage, options, onEvent = () => {}) {
     }
   }
 
-  return scannedPages;
+  return { scannedPages, socialLinks };
 }
 
 function extractAnchors(html, baseUrl) {
@@ -370,6 +384,52 @@ function extractAnchors(html, baseUrl) {
   }
 
   return anchors;
+}
+
+export { extractSocialLinks, extractAnchors };
+
+const SOCIAL_PATTERNS = [
+  { key: 'instagramUrl', pattern: /^https?:\/\/(www\.)?instagram\.com\/[^/?#]+/i },
+  { key: 'facebookUrl', pattern: /^https?:\/\/(www\.)?(facebook|fb)\.com\/[^/?#]+/i },
+  { key: 'linkedinUrl', pattern: /^https?:\/\/(www\.)?linkedin\.com\/(in|company)\/[^/?#]+/i },
+  { key: 'twitterUrl', pattern: /^https?:\/\/(www\.)?(twitter|x)\.com\/[^/?#]+/i },
+  { key: 'tiktokUrl', pattern: /^https?:\/\/(www\.)?tiktok\.com\/@[^/?#]+/i },
+  { key: 'youtubeUrl', pattern: /^https?:\/\/(www\.)?youtube\.com\/(c\/|channel\/|@)[^/?#]+/i },
+];
+
+const SOCIAL_SKIP_PATTERN = /\/sharer\b|\/intent\b|\/share[?/]|\/dialog\b/i;
+
+function extractSocialLinks(anchors) {
+  const result = {};
+  for (const { key } of SOCIAL_PATTERNS) {
+    result[key] = null;
+  }
+
+  for (const anchor of anchors) {
+    if (SOCIAL_SKIP_PATTERN.test(anchor.url)) {
+      continue;
+    }
+
+    for (const { key, pattern } of SOCIAL_PATTERNS) {
+      if (result[key] === null && pattern.test(anchor.url)) {
+        const match = anchor.url.match(pattern);
+        if (match) {
+          result[key] = match[0];
+        }
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+function mergeSocialLinks(target, source) {
+  for (const { key } of SOCIAL_PATTERNS) {
+    if (target[key] === null && source[key] !== null) {
+      target[key] = source[key];
+    }
+  }
 }
 
 function htmlToLines(html) {

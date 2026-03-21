@@ -43,6 +43,7 @@ export function normalizeRunOptions(input = {}, { requireCities = true } = {}) {
     ),
     headless: normalizeBoolean(input.headless, defaultConfig.headless),
     enrichWebsite: normalizeBoolean(input.enrichWebsite, defaultConfig.enrichWebsite),
+    coordinates: normalizeCoordinates(input),
   };
 }
 
@@ -87,6 +88,30 @@ export function normalizeFormats(value) {
   ];
 
   return normalized.length ? normalized : [...defaultConfig.formats];
+}
+
+function normalizeCoordinates(input) {
+  const lat = input.lat != null ? parseFloat(input.lat) : null;
+  const lng = input.lng != null ? parseFloat(input.lng) : null;
+
+  if (lat == null && lng == null) {
+    return undefined;
+  }
+
+  if (lat == null || lng == null) {
+    throw new Error('Both --lat and --lng must be provided together.');
+  }
+
+  if (lat < -90 || lat > 90) {
+    throw new Error(`Latitude must be between -90 and 90, got ${lat}`);
+  }
+
+  if (lng < -180 || lng > 180) {
+    throw new Error(`Longitude must be between -180 and 180, got ${lng}`);
+  }
+
+  const zoom = input.zoom != null ? Number.parseInt(input.zoom, 10) : 15;
+  return { lat, lng, zoom };
 }
 
 function normalizeCities(value) {
