@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {
-  buildCompletionMessage,
-  deriveRunButtonView,
-  deriveStatusView,
-  formatDuration,
-} from '../src/ui/view-model.js';
+import { buildCompletionMessage, deriveRunButtonView, deriveStatusView, formatDuration } from '../src/ui/view-model.js';
 
 export const tests = [
   {

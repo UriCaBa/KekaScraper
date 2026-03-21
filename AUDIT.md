@@ -2,36 +2,36 @@
 
 ## Project Profile
 
-| Aspect | Detected |
-|---|---|
-| **Language** | JavaScript (ESM), Node.js 20.19+ |
-| **Framework** | Electron 41.0.3 + Playwright 1.58.2 |
-| **Architecture** | Shared scraper engine (CLI + Electron desktop), local-first |
-| **Database** | None (file-based: JSON/CSV exports, JSON checkpoints) |
-| **Infrastructure** | electron-builder (NSIS/DMG), no CI/CD |
-| **Purpose** | Local hostel lead-generation tool: Google Maps scraping + website enrichment |
+| Aspect             | Detected                                                                     |
+| ------------------ | ---------------------------------------------------------------------------- |
+| **Language**       | JavaScript (ESM), Node.js 20.19+                                             |
+| **Framework**      | Electron 41.0.3 + Playwright 1.58.2                                          |
+| **Architecture**   | Shared scraper engine (CLI + Electron desktop), local-first                  |
+| **Database**       | None (file-based: JSON/CSV exports, JSON checkpoints)                        |
+| **Infrastructure** | electron-builder (NSIS/DMG), no CI/CD                                        |
+| **Purpose**        | Local hostel lead-generation tool: Google Maps scraping + website enrichment |
 
 ## Agents Launched
 
-| Agent | Model | Files Examined | Findings |
-|---|---|---|---|
-| Architecture | Opus 4.6 | 14 | 2C / 8I / 6S / 8V |
-| Security | Opus 4.6 | 14 | 0C / 5I / 5S / 10V |
-| Performance | Opus 4.6 | 10 | 2C / 6I / 6S / 10V |
-| Testing Quality | Opus 4.6 | 21 | 4C / 7I / 8S / 8V |
-| Code Quality | Opus 4.6 | 14 | 2C / 10I / 8S / 10V |
+| Agent           | Model    | Files Examined | Findings            |
+| --------------- | -------- | -------------- | ------------------- |
+| Architecture    | Opus 4.6 | 14             | 2C / 8I / 6S / 8V   |
+| Security        | Opus 4.6 | 14             | 0C / 5I / 5S / 10V  |
+| Performance     | Opus 4.6 | 10             | 2C / 6I / 6S / 10V  |
+| Testing Quality | Opus 4.6 | 21             | 4C / 7I / 8S / 8V   |
+| Code Quality    | Opus 4.6 | 14             | 2C / 10I / 8S / 10V |
 
 **Legend**: C = Critical, I = Important, S = Suggestion, V = Validated
 
 ## Summary (after deduplication)
 
-| Severity | Count |
-|---|---|
-| CRITICAL | 2 |
-| IMPORTANT | 17 |
-| SUGGESTION | 15 |
-| VALIDATED | 12 |
-| **Total** | **46** |
+| Severity   | Count  |
+| ---------- | ------ |
+| CRITICAL   | 2      |
+| IMPORTANT  | 17     |
+| SUGGESTION | 15     |
+| VALIDATED  | 12     |
+| **Total**  | **46** |
 
 ---
 
@@ -44,10 +44,12 @@ Findings that must be fixed before shipping. Runtime failures under normal usage
 **Location**: `src/lib/maps.js:295`
 **Found by**: 4/5 agents (Architecture, Performance, Code Quality, Testing)
 **Finding**: `let consentDismissedForContext = false;` is a module-level variable. Once set to `true` after dismissing Google's consent dialog, it never resets. Two impacts:
+
 1. **Electron multi-run**: In a long-lived Electron process, the second scrape run reuses the stale `true` flag even though the browser context is new. If consent re-appears, it is never dismissed, causing the scrape to silently return garbage data.
 2. **Concurrency**: With `concurrency > 1`, all city workers share the same flag. A race exists where city A sets it `true` while city B's page still has an undismissed dialog.
-**Impact**: Second scrape run in Electron silently fails. Concurrent city scraping may miss consent dialogs.
-**Recommendation**: Track consent per browser context via WeakMap:
+   **Impact**: Second scrape run in Electron silently fails. Concurrent city scraping may miss consent dialogs.
+   **Recommendation**: Track consent per browser context via WeakMap:
+
 ```js
 const consentDismissedByContext = new WeakMap();
 
@@ -134,7 +136,7 @@ Issues that should be fixed soon. Performance under load, missing error handling
 
 **Location**: `src/lib/website-enricher.js:270-322`
 **Finding**: Raw `html` string, `lines` array from `htmlToLines(html)`, and `lines.join(' ')` all exist simultaneously. `extractEmails` is called on both the full HTML and the joined lines -- running the same regex twice on near-identical content.
-**Impact**: Triples memory per page. With 3 concurrent enrichments * 8 pages, ~14MB of redundant strings.
+**Impact**: Triples memory per page. With 3 concurrent enrichments \* 8 pages, ~14MB of redundant strings.
 **Recommendation**: Extract emails once from text lines, once from raw HTML for mailto only. Drop `extractEmails(html)`.
 
 ### Performance: Preferences file write not atomic on Windows
@@ -168,6 +170,7 @@ Issues that should be fixed soon. Performance under load, missing error handling
 
 **Found by**: Testing agent
 **Modules**:
+
 - `src/lib/exporters.js` (25 lines) -- writes final JSON/CSV output. A regression silently corrupts all exported data.
 - `src/lib/browser.js` (148 lines) -- launches Playwright browser. If it fails, nothing works. Auto-fallback cascade (msedge -> chrome -> bundled) is untested.
 - `src/electron/preferences.js` (51 lines) -- load/save with prototype pollution guard. Security boundary with zero coverage.
@@ -231,7 +234,7 @@ Nice-to-have improvements. Code style, edge cases, future-proofing.
 ### Performance: Dashboard search rebuilds entire DOM per keystroke
 
 **Location**: `src/ui/app.js:663-706`
-**Finding**: Every `input` event on `dashSearch` creates ~3500 DOM elements (7 cells * 500 rows).
+**Finding**: Every `input` event on `dashSearch` creates ~3500 DOM elements (7 cells \* 500 rows).
 **Recommendation**: Debounce 150ms.
 
 ### Performance: Activity log fully rebuilt on every scrape event
@@ -354,19 +357,19 @@ Good decisions that should be preserved. Positive reinforcement.
 
 ## Metrics
 
-| Metric | Value |
-|--------|-------|
-| Source files audited | ~20 |
-| Test files audited | 11 |
-| Findings (pre-dedup) | 80+ |
-| Findings (post-dedup) | 46 |
-| Duplicates removed | ~34 (30-50% overlap, as expected) |
-| Exploitable critical vulnerabilities | **0** |
-| Functional critical bugs | **2** |
-| Production-readiness gaps | **17** (IMPORTANT tier) |
+| Metric                               | Value                             |
+| ------------------------------------ | --------------------------------- |
+| Source files audited                 | ~20                               |
+| Test files audited                   | 11                                |
+| Findings (pre-dedup)                 | 80+                               |
+| Findings (post-dedup)                | 46                                |
+| Duplicates removed                   | ~34 (30-50% overlap, as expected) |
+| Exploitable critical vulnerabilities | **0**                             |
+| Functional critical bugs             | **2**                             |
+| Production-readiness gaps            | **17** (IMPORTANT tier)           |
 
 **Verdict**: The codebase has excellent security foundations (Electron hardening, zero innerHTML, strict CSP, prototype pollution guards) and clean architecture (shared engine, event system, checkpoint durability). The two CRITICAL issues are both related to the same root cause (module-level mutable state) and a dead UI control -- both straightforward fixes. The IMPORTANT tier is dominated by code duplication (classic AI-generated pattern), missing test coverage for 3 critical modules, and performance optimizations for multi-city runs. The app is shippable after fixing the 2 CRITICALs and the proxy credential leak.
 
 ---
 
-*Quieres que implemente las correcciones? Tambien puedo guardar las best practices validadas en el CLAUDE.md del proyecto para futuras sesiones.*
+_Quieres que implemente las correcciones? Tambien puedo guardar las best practices validadas en el CLAUDE.md del proyecto para futuras sesiones._

@@ -43,7 +43,7 @@ for (const suite of suites) {
       await Promise.race([
         testCase.run(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Test timed out after ${TIMEOUT_MS}ms`)), TIMEOUT_MS)
+          setTimeout(() => reject(new Error(`Test timed out after ${TIMEOUT_MS}ms`)), TIMEOUT_MS),
         ),
       ]);
       console.log(`ok ${total} - ${testCase.name}`);

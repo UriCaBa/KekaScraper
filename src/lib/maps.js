@@ -408,10 +408,16 @@ async function readListingUrls(page) {
   const feed = page.locator('[role="feed"], div[aria-label*="Results"]').first();
 
   if (await feed.count()) {
-    return feed.locator(LISTING_LINK_SELECTOR).evaluateAll(extractPlaceUrls).catch(() => []);
+    return feed
+      .locator(LISTING_LINK_SELECTOR)
+      .evaluateAll(extractPlaceUrls)
+      .catch(() => []);
   }
 
-  return page.locator(LISTING_LINK_SELECTOR).evaluateAll(extractPlaceUrls).catch(() => []);
+  return page
+    .locator(LISTING_LINK_SELECTOR)
+    .evaluateAll(extractPlaceUrls)
+    .catch(() => []);
 }
 
 async function scrollResultsPanel(page) {
