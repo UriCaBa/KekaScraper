@@ -53,6 +53,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
 
   let cityFailures = 0;
   let lastCheckpointTime = 0;
+  let hasUnsavedProgress = false;
   const CHECKPOINT_INTERVAL_MS = 5000;
   const concurrency = Math.min(normalizedRunConfig.concurrency, remainingCities.length || 1);
   const totalCities = normalizedRunConfig.cities.length;
@@ -106,11 +107,13 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
           cityStats: cityCompleted.cityStats,
         });
 
+        hasUnsavedProgress = true;
         const now = Date.now();
         const isLastCity = completedCities.size === totalCities;
         if (isLastCity || now - lastCheckpointTime >= CHECKPOINT_INTERVAL_MS) {
           await saveCheckpoint(outputDir, runId, completedCities, allResults, normalizedRunConfig);
           lastCheckpointTime = now;
+          hasUnsavedProgress = false;
         }
       } catch (error) {
         cityFailures += 1;
@@ -129,9 +132,9 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     await Promise.allSettled([context.close(), browser.close()]);
   }
 
-  // Always save a final checkpoint after all cities are processed,
-  // regardless of debounce, to capture any cities completed since the last save.
-  if (completedCities.size > 0) {
+  // Save a final checkpoint only if cities completed since the last debounced save.
+  // Skips redundant I/O when the last city already triggered a save via isLastCity.
+  if (hasUnsavedProgress) {
     await saveCheckpoint(outputDir, runId, completedCities, allResults, normalizedRunConfig);
   }
 

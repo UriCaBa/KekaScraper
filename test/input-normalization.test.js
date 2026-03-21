@@ -67,8 +67,11 @@ export const tests = [
     },
   },
   {
-    name: 'isLikelyPublicHostname accepts IP-like dotted values that match hostname pattern',
+    name: 'isLikelyPublicHostname accepts IP-like dotted values (current behavior — no private-range filtering)',
     run: () => {
+      // Note: isLikelyPublicHostname checks hostname format (multi-label, no blocked tokens)
+      // but does NOT filter private/loopback IP ranges. A future enhancement could reject
+      // 127.x.x.x, 10.x.x.x, 172.16-31.x.x, 192.168.x.x to prevent SSRF-like fetches.
       assert.equal(isLikelyPublicHostname('192.168.1.1'), true);
     },
   },

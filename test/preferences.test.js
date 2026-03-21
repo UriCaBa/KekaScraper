@@ -97,7 +97,8 @@ export const tests = [
   {
     name: 'sanitizePreferences filters out __proto__ key',
     run: () => {
-      const result = sanitizePreferences({ __proto__: 'evil', theme: 'dark' }, FALLBACK_STATE);
+      const input = JSON.parse('{"__proto__":"evil","theme":"dark"}');
+      const result = sanitizePreferences(input, FALLBACK_STATE);
       assert.equal(result.theme, 'dark');
       assert.equal(Object.hasOwn(result, '__proto__'), false);
     },

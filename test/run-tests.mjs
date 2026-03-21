@@ -39,18 +39,21 @@ for (const suite of suites) {
   for (const testCase of suite.tests) {
     total += 1;
 
+    let timer;
     try {
       await Promise.race([
         testCase.run(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Test timed out after ${TIMEOUT_MS}ms`)), TIMEOUT_MS),
-        ),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`Test timed out after ${TIMEOUT_MS}ms`)), TIMEOUT_MS);
+        }),
       ]);
       console.log(`ok ${total} - ${testCase.name}`);
     } catch (error) {
       failed += 1;
       console.log(`not ok ${total} - ${testCase.name}`);
       console.log(error?.stack ?? error?.message ?? String(error));
+    } finally {
+      clearTimeout(timer);
     }
   }
 }
