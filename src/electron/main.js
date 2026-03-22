@@ -234,10 +234,15 @@ function registerIpcHandlers() {
       return { results: [], fileCount: 0 };
     }
 
-    const jsonFiles = entries.filter(
-      (e) =>
-        e.isFile() && e.name.startsWith('hostels-') && e.name.endsWith('.json') && !e.name.endsWith('-checkpoint.json'),
-    );
+    const jsonFiles = entries
+      .filter(
+        (e) =>
+          e.isFile() &&
+          e.name.startsWith('hostels-') &&
+          e.name.endsWith('.json') &&
+          !e.name.endsWith('-checkpoint.json'),
+      )
+      .sort((a, b) => b.name.localeCompare(a.name));
 
     const allItems = [];
     for (const entry of jsonFiles) {
@@ -417,9 +422,13 @@ function startDesktopScrape(runConfig) {
 async function runScrapeBatched(runConfig) {
   const totalRequested = runConfig.resultLimit;
   const batchCount = Math.ceil(totalRequested / BATCH_SIZE);
-  let allResults = [];
+  const allResults = [];
   let lastSummary = null;
-  let lastOutputFiles = [];
+  const lastOutputFiles = [];
+
+  // Force JSON output so each batch writes a file that subsequent batches
+  // can read for URL exclusion (loadPreviousResultUrls scans hostels-*.json).
+  const batchFormats = runConfig.formats.includes('json') ? runConfig.formats : [...runConfig.formats, 'json'];
 
   for (let batch = 0; batch < batchCount; batch++) {
     const remaining = totalRequested - allResults.length;
@@ -435,7 +444,10 @@ async function runScrapeBatched(runConfig) {
       batchLimit,
     });
 
-    const result = await runScrape({ ...runConfig, resultLimit: batchLimit }, { onEvent: sendScrapeEvent });
+    const result = await runScrape(
+      { ...runConfig, resultLimit: batchLimit, formats: batchFormats },
+      { onEvent: sendScrapeEvent },
+    );
 
     allResults.push(...result.results);
     lastSummary = result.summary;

@@ -212,6 +212,8 @@ export function timestampLabel(date = new Date()) {
     pad(date.getHours()),
     pad(date.getMinutes()),
     pad(date.getSeconds()),
+    '-',
+    String(date.getMilliseconds()).padStart(3, '0'),
   ].join('');
 }
 
