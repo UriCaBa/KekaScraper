@@ -305,7 +305,8 @@ button.secondary:hover:not(:disabled) {
 }
 
 .requirement-note {
-  opacity: 0.6;
+  color: var(--muted);
+  font-size: 0.8rem;
   font-style: italic;
 }
 
