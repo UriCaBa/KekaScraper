@@ -31,6 +31,7 @@ export const tests = [
         'app:pick-output-folder',
         'app:open-external-url',
         'app:load-results-file',
+        'app:load-all-results',
         'scrape:start',
         'scrape:open-output-folder',
         'scrape:open-output-file',
@@ -51,6 +52,7 @@ export const tests = [
         'openOutputFile',
         'openExternalUrl',
         'loadResultsFile',
+        'loadAllResults',
         'pickOutputFolder',
         'onScrapeEvent',
       ];

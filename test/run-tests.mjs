@@ -1,4 +1,5 @@
 import { tests as browserTests } from './browser.test.js';
+import { tests as dashboardUtilsTests } from './dashboard-utils.test.js';
 import { tests as electronContractsTests } from './electron-contracts.test.js';
 import { tests as exportersTests } from './exporters.test.js';
 import { tests as inputNormalizationTests } from './input-normalization.test.js';
@@ -14,6 +15,7 @@ import { tests as websiteEnricherTests } from './website-enricher.test.js';
 
 const suites = [
   { name: 'browser', tests: browserTests },
+  { name: 'dashboard-utils', tests: dashboardUtilsTests },
   { name: 'electron-contracts', tests: electronContractsTests },
   { name: 'exporters', tests: exportersTests },
   { name: 'input-normalization', tests: inputNormalizationTests },

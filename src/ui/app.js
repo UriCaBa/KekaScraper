@@ -1,4 +1,5 @@
 import { RUN_EVENT_TYPES } from '../lib/run-events.js';
+import { computeStats, filterResults } from '../shared/dashboard-utils.js';
 import { countUniqueCities, normalizePublicUrl } from '../shared/input-normalization.js';
 import { formatListingSkipReason } from '../shared/event-formatting.js';
 import { isEmptyListing } from '../shared/listing-utils.js';
@@ -23,11 +24,6 @@ const state = {
   outputFiles: [],
   lastCompletedSummary: null,
   activeTab: 'scrape',
-  dashResults: [],
-  dashSelectedIndex: -1,
-  dashSearchQuery: '',
-  dashFileName: '',
-  dashStatFilter: null,
 };
 
 const RESULTS_PREVIEW_LIMIT = 200;
@@ -62,31 +58,58 @@ const elements = {
   helpDialog: document.querySelector('#help-dialog'),
   tabButtons: [...document.querySelectorAll('.tab-button')],
   tabScrape: document.querySelector('#tab-scrape'),
+  tabLastScrape: document.querySelector('#tab-last-scrape'),
   tabDashboard: document.querySelector('#tab-dashboard'),
   dashLoadJson: document.querySelector('#dash-load-json'),
-  dashFileLabel: document.querySelector('#dash-file-label'),
-  dashSearch: document.querySelector('#dash-search'),
-  dashCount: document.querySelector('#dash-count'),
-  dashEmpty: document.querySelector('#dash-empty'),
-  dashContent: document.querySelector('#dash-content'),
-  dashTableBody: document.querySelector('#dash-table-body'),
-  dashHint: document.querySelector('#dash-hint'),
-  dashDetailContainer: document.querySelector('#dash-detail-container'),
-  detailName: document.querySelector('#detail-name'),
-  detailSubtitle: document.querySelector('#detail-subtitle'),
-  detailClose: document.querySelector('#detail-close'),
-  detailBasic: document.querySelector('#detail-basic'),
-  detailContact: document.querySelector('#detail-contact'),
-  detailDm: document.querySelector('#detail-dm'),
-  detailSocial: document.querySelector('#detail-social'),
-  detailEnrichment: document.querySelector('#detail-enrichment'),
-  statTotal: document.querySelector('#stat-total'),
-  statWithEmail: document.querySelector('#stat-with-email'),
-  statWithPhone: document.querySelector('#stat-with-phone'),
-  statWithDm: document.querySelector('#stat-with-dm'),
-  statEnriched: document.querySelector('#stat-enriched'),
-  statWithSocial: document.querySelector('#stat-with-social'),
 };
+
+function createViewElements(prefix) {
+  return {
+    fileLabel: document.querySelector(`#${prefix}-file-label`),
+    search: document.querySelector(`#${prefix}-search`),
+    count: document.querySelector(`#${prefix}-count`),
+    empty: document.querySelector(`#${prefix}-empty`),
+    content: document.querySelector(`#${prefix}-content`),
+    tableBody: document.querySelector(`#${prefix}-table-body`),
+    hint: document.querySelector(`#${prefix}-hint`),
+    detailContainer: document.querySelector(`#${prefix}-detail-container`),
+    detailName: document.querySelector(`#${prefix}-detail-name`),
+    detailSubtitle: document.querySelector(`#${prefix}-detail-subtitle`),
+    detailClose: document.querySelector(`#${prefix}-detail-close`),
+    detailBasic: document.querySelector(`#${prefix}-detail-basic`),
+    detailContact: document.querySelector(`#${prefix}-detail-contact`),
+    detailDm: document.querySelector(`#${prefix}-detail-dm`),
+    detailSocial: document.querySelector(`#${prefix}-detail-social`),
+    detailEnrichment: document.querySelector(`#${prefix}-detail-enrichment`),
+    statTotal: document.querySelector(`#${prefix}-stat-total`),
+    statWithEmail: document.querySelector(`#${prefix}-stat-with-email`),
+    statWithPhone: document.querySelector(`#${prefix}-stat-with-phone`),
+    statWithDm: document.querySelector(`#${prefix}-stat-with-dm`),
+    statEnriched: document.querySelector(`#${prefix}-stat-enriched`),
+    statWithSocial: document.querySelector(`#${prefix}-stat-with-social`),
+    footerCount: document.querySelector(`#${prefix}-footer-count`),
+    statBarEmail: document.querySelector(`#${prefix}-stat-bar-email`),
+    statBarPhone: document.querySelector(`#${prefix}-stat-bar-phone`),
+    statBarDm: document.querySelector(`#${prefix}-stat-bar-dm`),
+    statBarEnriched: document.querySelector(`#${prefix}-stat-bar-enriched`),
+    statBarSocial: document.querySelector(`#${prefix}-stat-bar-social`),
+  };
+}
+
+function createView(prefix) {
+  return {
+    results: [],
+    selectedIndex: -1,
+    searchQuery: '',
+    statFilter: null,
+    fileName: '',
+    loaded: false,
+    elements: createViewElements(prefix),
+  };
+}
+
+const lastScrapeView = createView('ls');
+const dashboardView = createView('dash');
 
 elements.runButton.disabled = true;
 elements.runButton.textContent = 'Loading...';
@@ -167,40 +190,49 @@ async function bootstrap() {
 
   // Tab navigation
   for (const button of elements.tabButtons) {
-    button.addEventListener('click', () => {
-      switchTab(button.dataset.tab);
+    button.addEventListener('click', async () => {
+      await switchTab(button.dataset.tab);
     });
   }
 
-  // Dashboard: load JSON
+  // Dashboard: load JSON (adds to dashboard view)
   elements.dashLoadJson.addEventListener('click', async () => {
     await runUiAction(handleLoadResults, 'Failed to load results file');
   });
 
-  // Dashboard: search
-  elements.dashSearch.addEventListener('input', () => {
-    state.dashSearchQuery = elements.dashSearch.value.trim().toLowerCase();
-    renderDashTable();
-  });
+  // Wire up search, stat chips, detail close, and Escape for both views
+  for (const view of [lastScrapeView, dashboardView]) {
+    if (view.elements.search) {
+      view.elements.search.addEventListener('input', () => {
+        view.searchQuery = view.elements.search.value.trim().toLowerCase();
+        renderViewTable(view);
+      });
+    }
 
-  // Dashboard: stat chip filter toggle
+    if (view.elements.detailClose) {
+      view.elements.detailClose.addEventListener('click', () => {
+        closeViewDetail(view);
+      });
+    }
+  }
+
   for (const chip of document.querySelectorAll('.stat-chip[data-filter]')) {
     chip.addEventListener('click', () => {
+      const viewName = chip.dataset.view;
+      const view = viewName === 'lastScrape' ? lastScrapeView : dashboardView;
       const filter = chip.dataset.filter;
-      state.dashStatFilter = state.dashStatFilter === filter ? null : filter;
-      updateStatChipSelection();
-      renderDashTable();
+      view.statFilter = view.statFilter === filter ? null : filter;
+      updateViewStatChips(view, viewName);
+      renderViewTable(view);
     });
   }
 
-  // Dashboard: back to table from detail view
-  elements.detailClose.addEventListener('click', () => {
-    closeDashDetail();
-  });
-
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !elements.dashDetailContainer.hidden) {
-      closeDashDetail();
+    if (event.key === 'Escape') {
+      const activeView = state.activeTab === 'last-scrape' ? lastScrapeView : dashboardView;
+      if (activeView.elements.detailContainer && !activeView.elements.detailContainer.hidden) {
+        closeViewDetail(activeView);
+      }
     }
   });
 
@@ -216,7 +248,7 @@ async function bootstrap() {
 
 // ── Tab switching ──
 
-function switchTab(tabName) {
+async function switchTab(tabName) {
   state.activeTab = tabName;
 
   for (const button of elements.tabButtons) {
@@ -226,7 +258,20 @@ function switchTab(tabName) {
   }
 
   elements.tabScrape.hidden = tabName !== 'scrape';
+  elements.tabLastScrape.hidden = tabName !== 'last-scrape';
   elements.tabDashboard.hidden = tabName !== 'dashboard';
+
+  if (tabName === 'dashboard' && !dashboardView.loaded) {
+    try {
+      const data = await getBridge().loadAllResults();
+      dashboardView.results = data.results.filter((item) => !isEmptyListing(item)).slice(0, DASH_ROW_LIMIT);
+      dashboardView.fileName = data.fileCount > 0 ? `${data.fileCount} files from output folder` : '';
+      dashboardView.loaded = true;
+      renderView(dashboardView);
+    } catch {
+      // Auto-load failure is non-fatal — user can still use Load JSON.
+    }
+  }
 }
 
 // ── Scrape logic (unchanged) ──
@@ -269,16 +314,18 @@ async function handleSubmit() {
     elements.outputDirectory.textContent = result.summary.outputDirectory;
     appendLog(formatCompletionMessage(result.summary));
 
-    // Push results to dashboard and auto-switch (filter phantom listings)
-    state.dashResults = state.results.filter((item) => !isEmptyListing(item));
-    state.dashSelectedIndex = -1;
-    state.dashFileName = '';
-    state.dashStatFilter = null;
-    state.dashSearchQuery = '';
-    elements.dashSearch.value = '';
-    updateStatChipSelection();
-    renderDashboard();
-    switchTab('dashboard');
+    // Push results to Last Scrape view and auto-switch
+    lastScrapeView.results = state.results.filter((item) => !isEmptyListing(item));
+    lastScrapeView.selectedIndex = -1;
+    lastScrapeView.fileName = '';
+    lastScrapeView.statFilter = null;
+    lastScrapeView.searchQuery = '';
+    if (lastScrapeView.elements.search) lastScrapeView.elements.search.value = '';
+    updateViewStatChips(lastScrapeView, 'lastScrape');
+    renderView(lastScrapeView);
+    // Invalidate dashboard so it reloads with new data on next visit
+    dashboardView.loaded = false;
+    await switchTab('last-scrape');
   } catch (error) {
     appendLog(error.message, 'error');
     elements.statusCopy.textContent = error.message;
@@ -377,6 +424,9 @@ function handleScrapeEvent(event) {
       state.completedCities = event.summary.totalCities ?? state.completedCities;
       elements.statusPhase.textContent = 'Completed';
       elements.statusCopy.textContent = `Finished with ${event.summary.totalResults ?? state.totalResults} rows in ${formatRunDuration(event.summary.durationMs)}.`;
+      break;
+    case RUN_EVENT_TYPES.BATCH_STARTED:
+      appendLog(`Starting batch ${event.batch} of ${event.totalBatches} (${event.batchLimit} listings).`);
       break;
     default:
       break;
@@ -595,6 +645,7 @@ function getBridge() {
     'openExternalUrl',
     'onScrapeEvent',
     'loadResultsFile',
+    'loadAllResults',
     'pickOutputFolder',
   ]) {
     if (typeof bridge[methodName] !== 'function') {
@@ -605,147 +656,93 @@ function getBridge() {
   return bridge;
 }
 
-// ── Dashboard ──
+// ── Dashboard / View System ──
 
-function closeDashDetail() {
-  state.dashSelectedIndex = -1;
-  elements.dashDetailContainer.hidden = true;
-  elements.dashContent.hidden = false;
+function closeViewDetail(view) {
+  view.selectedIndex = -1;
+  if (view.elements.detailContainer) view.elements.detailContainer.hidden = true;
+  if (view.elements.content) view.elements.content.hidden = false;
 }
 
 async function handleLoadResults() {
   const data = await getBridge().loadResultsFile();
-  if (!data) {
-    return;
-  }
+  if (!data) return;
 
   const filtered = data.results.filter((item) => !isEmptyListing(item));
 
-  // Deduplicate by googleMapsUrl when loading multiple files
   const seen = new Set();
   const deduped = [];
   for (const item of filtered) {
     const key = item.googleMapsUrl || '';
-    if (key && seen.has(key)) {
-      continue;
-    }
-    if (key) {
-      seen.add(key);
-    }
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
     deduped.push(item);
   }
 
-  state.dashResults = deduped.slice(0, DASH_ROW_LIMIT);
+  dashboardView.results = deduped.slice(0, DASH_ROW_LIMIT);
   if (deduped.length > DASH_ROW_LIMIT) {
-    appendLog(
-      `Dashboard shows first ${DASH_ROW_LIMIT} of ${deduped.length} results. Open the exported file for the full dataset.`,
-    );
+    appendLog(`Dashboard shows first ${DASH_ROW_LIMIT} of ${deduped.length} results.`);
     renderStatus();
   }
-  state.dashSelectedIndex = -1;
-  state.dashFileName = data.fileName;
-  state.dashSearchQuery = '';
-  state.dashStatFilter = null;
-  elements.dashSearch.value = '';
-  elements.dashDetailContainer.hidden = true;
-  updateStatChipSelection();
-  renderDashboard();
+  dashboardView.selectedIndex = -1;
+  dashboardView.fileName = data.fileName;
+  dashboardView.searchQuery = '';
+  dashboardView.statFilter = null;
+  dashboardView.loaded = true;
+  if (dashboardView.elements.search) dashboardView.elements.search.value = '';
+  if (dashboardView.elements.detailContainer) dashboardView.elements.detailContainer.hidden = true;
+  updateViewStatChips(dashboardView, 'dashboard');
+  renderView(dashboardView);
 }
 
-const STAT_FILTER_FNS = {
-  total: () => true,
-  withEmail: (r) => Boolean(r.generalEmail),
-  withPhone: (r) => Boolean(r.phone || r.websitePhone),
-  withDm: (r) => Boolean(r.decisionMakerName),
-  enriched: (r) => r.websiteScanStatus === 'ok',
-  withSocial: (r) => Boolean(r.instagramUrl || r.facebookUrl || r.linkedinUrl || r.twitterUrl),
-};
-
-function getFilteredDashResults() {
-  let results = state.dashResults;
-
-  if (state.dashStatFilter && STAT_FILTER_FNS[state.dashStatFilter]) {
-    results = results.filter(STAT_FILTER_FNS[state.dashStatFilter]);
-  }
-
-  if (!state.dashSearchQuery) {
-    return results;
-  }
-
-  const query = state.dashSearchQuery;
-  return results.filter((item) => {
-    const haystack = [item.name, item.searchedCity, item.generalEmail, item.bestContactValue, item.website]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    return haystack.includes(query);
-  });
+function getFilteredResults(view) {
+  return filterResults(view.results, view.statFilter, view.searchQuery);
 }
 
-function updateStatChipSelection() {
-  for (const chip of document.querySelectorAll('.stat-chip[data-filter]')) {
-    const isActive = chip.dataset.filter === state.dashStatFilter;
+function updateViewStatChips(view, viewName) {
+  for (const chip of document.querySelectorAll(`.stat-chip[data-view="${viewName}"]`)) {
+    const isActive = chip.dataset.filter === view.statFilter;
     chip.classList.toggle('stat-chip-active', isActive);
     chip.setAttribute('aria-pressed', String(isActive));
   }
 }
 
-function computeStats(results) {
-  const total = results.length;
-  const withEmail = results.filter((r) => r.generalEmail).length;
-  const withPhone = results.filter((r) => r.phone || r.websitePhone).length;
-  const withDm = results.filter((r) => r.decisionMakerName).length;
-  const enriched = results.filter((r) => r.websiteScanStatus === 'ok').length;
-  const withSocial = results.filter((r) => r.instagramUrl || r.facebookUrl || r.linkedinUrl || r.twitterUrl).length;
-  return { total, withEmail, withPhone, withDm, enriched, withSocial };
-}
-
-function renderDashboard() {
-  const allResults = state.dashResults;
+function renderView(view) {
+  const el = view.elements;
+  const allResults = view.results;
   const hasData = allResults.length > 0;
 
-  elements.dashEmpty.hidden = hasData;
-  elements.dashContent.hidden = !hasData;
-  elements.dashFileLabel.textContent = state.dashFileName ? state.dashFileName : '';
+  if (el.empty) el.empty.hidden = hasData;
+  if (el.content) el.content.hidden = !hasData;
+  if (el.fileLabel) el.fileLabel.textContent = view.fileName || '';
 
   const stats = computeStats(allResults);
   const total = stats.total || 1;
-  elements.statTotal.textContent = `${stats.total}`;
-  elements.statWithEmail.textContent = `${stats.withEmail}`;
-  elements.statWithPhone.textContent = `${stats.withPhone}`;
-  elements.statWithDm.textContent = `${stats.withDm}`;
-  elements.statEnriched.textContent = `${stats.enriched}`;
-  elements.statWithSocial.textContent = `${stats.withSocial}`;
+  if (el.statTotal) el.statTotal.textContent = `${stats.total}`;
+  if (el.statWithEmail) el.statWithEmail.textContent = `${stats.withEmail}`;
+  if (el.statWithPhone) el.statWithPhone.textContent = `${stats.withPhone}`;
+  if (el.statWithDm) el.statWithDm.textContent = `${stats.withDm}`;
+  if (el.statEnriched) el.statEnriched.textContent = `${stats.enriched}`;
+  if (el.statWithSocial) el.statWithSocial.textContent = `${stats.withSocial}`;
 
-  setStatBar('stat-bar-email', stats.withEmail, total);
-  setStatBar('stat-bar-phone', stats.withPhone, total);
-  setStatBar('stat-bar-dm', stats.withDm, total);
-  setStatBar('stat-bar-enriched', stats.enriched, total);
-  setStatBar('stat-bar-social', stats.withSocial, total);
+  if (el.statBarEmail) el.statBarEmail.style.width = `${Math.round((stats.withEmail / total) * 100)}%`;
+  if (el.statBarPhone) el.statBarPhone.style.width = `${Math.round((stats.withPhone / total) * 100)}%`;
+  if (el.statBarDm) el.statBarDm.style.width = `${Math.round((stats.withDm / total) * 100)}%`;
+  if (el.statBarEnriched) el.statBarEnriched.style.width = `${Math.round((stats.enriched / total) * 100)}%`;
+  if (el.statBarSocial) el.statBarSocial.style.width = `${Math.round((stats.withSocial / total) * 100)}%`;
 
-  renderDashTable();
+  renderViewTable(view);
 }
 
-function setStatBar(id, count, total) {
-  const bar = document.querySelector(`#${id}`);
-  if (bar) {
-    bar.style.width = `${Math.round((count / total) * 100)}%`;
-  }
-}
+function renderViewTable(view) {
+  const el = view.elements;
+  const filtered = getFilteredResults(view);
 
-function renderDashTable() {
-  const filtered = getFilteredDashResults();
-  elements.dashCount.textContent = `${filtered.length} hostel${filtered.length === 1 ? '' : 's'}`;
-
-  const footerCount = document.querySelector('#dash-footer-count');
-  if (footerCount) {
-    footerCount.textContent = `Showing ${filtered.length} of ${state.dashResults.length} results`;
-  }
+  if (el.count) el.count.textContent = `${filtered.length} hostel${filtered.length === 1 ? '' : 's'}`;
+  if (el.footerCount) el.footerCount.textContent = `Showing ${filtered.length} of ${view.results.length} results`;
 
   const indexByItem = new Map();
-  state.dashResults.forEach((dashItem, index) => {
-    indexByItem.set(dashItem, index);
-  });
+  view.results.forEach((item, index) => indexByItem.set(item, index));
 
   const fragment = document.createDocumentFragment();
 
@@ -753,14 +750,12 @@ function renderDashTable() {
     const realIndex = indexByItem.get(item) ?? -1;
     const row = document.createElement('tr');
 
-    if (realIndex === state.dashSelectedIndex) {
-      row.classList.add('selected');
-    }
+    if (realIndex === view.selectedIndex) row.classList.add('selected');
 
     row.addEventListener('click', () => {
-      state.dashSelectedIndex = realIndex;
-      renderDashTable();
-      renderDashDetail(item);
+      view.selectedIndex = realIndex;
+      renderViewTable(view);
+      renderViewDetail(view, item);
     });
 
     row.append(
@@ -775,7 +770,7 @@ function renderDashTable() {
     fragment.append(row);
   }
 
-  elements.dashTableBody.replaceChildren(fragment);
+  if (el.tableBody) el.tableBody.replaceChildren(fragment);
 }
 
 function createDashCell(value, isBold, isPhone) {
@@ -840,17 +835,16 @@ function createStatusDotCell(status) {
   return cell;
 }
 
-function renderDashDetail(item) {
-  // Hide table, show detail view
-  elements.dashContent.hidden = true;
-  elements.dashDetailContainer.hidden = false;
+function renderViewDetail(view, item) {
+  const el = view.elements;
+  if (el.content) el.content.hidden = true;
+  if (el.detailContainer) el.detailContainer.hidden = false;
 
-  elements.detailName.textContent = item.name ?? 'Unknown';
+  if (el.detailName) el.detailName.textContent = item.name ?? 'Unknown';
   const parts = [item.searchedCity, item.category].filter(Boolean);
-  elements.detailSubtitle.textContent = parts.join(' \u00B7 ');
+  if (el.detailSubtitle) el.detailSubtitle.textContent = parts.join(' \u00B7 ');
 
-  // Contact (first — most important for outreach)
-  renderDetailGrid(elements.detailContact, [
+  renderDetailGrid(el.detailContact, [
     ['Best channel', item.bestContactChannel, 'highlight'],
     ['Best value', item.bestContactValue, 'highlight'],
     ['General email', item.generalEmail],
@@ -863,7 +857,7 @@ function renderDashDetail(item) {
   ]);
 
   // Decision Maker
-  renderDetailGrid(elements.detailDm, [
+  renderDetailGrid(el.detailDm, [
     ['Name', item.decisionMakerName],
     ['Role', item.decisionMakerRole],
     ['Email', item.decisionMakerEmail],
@@ -872,47 +866,49 @@ function renderDashDetail(item) {
   ]);
 
   // Social Media
-  const socialContainer = elements.detailSocial;
-  socialContainer.replaceChildren();
-  const socialEntries = [
-    ['Instagram', item.instagramUrl],
-    ['Facebook', item.facebookUrl],
-    ['LinkedIn', item.linkedinUrl],
-    ['Twitter/X', item.twitterUrl],
-    ['TikTok', item.tiktokUrl],
-    ['YouTube', item.youtubeUrl],
-  ];
+  const socialContainer = el.detailSocial;
+  if (socialContainer) {
+    socialContainer.replaceChildren();
+    const socialEntries = [
+      ['Instagram', item.instagramUrl],
+      ['Facebook', item.facebookUrl],
+      ['LinkedIn', item.linkedinUrl],
+      ['Twitter/X', item.twitterUrl],
+      ['TikTok', item.tiktokUrl],
+      ['YouTube', item.youtubeUrl],
+    ];
 
-  const linksDiv = document.createElement('div');
-  linksDiv.className = 'social-links';
-  let hasSocial = false;
+    const linksDiv = document.createElement('div');
+    linksDiv.className = 'social-links';
+    let hasSocial = false;
 
-  for (const [label, url] of socialEntries) {
-    if (!url) {
-      continue;
+    for (const [label, url] of socialEntries) {
+      if (!url) {
+        continue;
+      }
+      hasSocial = true;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary social-link';
+      button.textContent = label;
+      button.addEventListener('click', async () => {
+        await runUiAction(() => getBridge().openExternalUrl(url), `Failed to open ${label}`);
+      });
+      linksDiv.append(button);
     }
-    hasSocial = true;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'secondary social-link';
-    button.textContent = label;
-    button.addEventListener('click', async () => {
-      await runUiAction(() => getBridge().openExternalUrl(url), `Failed to open ${label}`);
-    });
-    linksDiv.append(button);
-  }
 
-  if (!hasSocial) {
-    const empty = document.createElement('div');
-    empty.className = 'detail-value empty';
-    empty.textContent = '\u2013';
-    socialContainer.append(empty);
-  } else {
-    socialContainer.append(linksDiv);
+    if (!hasSocial) {
+      const empty = document.createElement('div');
+      empty.className = 'detail-value empty';
+      empty.textContent = '\u2013';
+      socialContainer.append(empty);
+    } else {
+      socialContainer.append(linksDiv);
+    }
   }
 
   // Basic Info
-  renderDetailGrid(elements.detailBasic, [
+  renderDetailGrid(el.detailBasic, [
     ['Rating', item.rating != null ? `${item.rating} / 5` : null],
     ['Reviews', item.reviewCount],
     ['Category', item.category],
@@ -943,7 +939,7 @@ function renderDashDetail(item) {
     }
   }
 
-  renderDetailGrid(elements.detailEnrichment, enrichmentFields);
+  renderDetailGrid(el.detailEnrichment, enrichmentFields);
 }
 
 function renderDetailGrid(container, fields) {

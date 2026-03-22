@@ -41,6 +41,7 @@
 
       <nav class="tab-nav" role="tablist">
         <button class="tab-button active" role="tab" aria-selected="true" data-tab="scrape">Scrape</button>
+        <button class="tab-button" role="tab" aria-selected="false" data-tab="last-scrape">Last Scrape</button>
         <button class="tab-button" role="tab" aria-selected="false" data-tab="dashboard">Dashboard</button>
       </nav>
 
@@ -167,7 +168,103 @@
         </section>
       </main>
 
-      <!-- Tab 2: Dashboard -->
+      <!-- Tab 2: Last Scrape -->
+      <div id="tab-last-scrape" class="tab-content" role="tabpanel" hidden>
+        <div class="dash-toolbar">
+          <div class="dash-toolbar-left">
+            <span id="ls-file-label" class="dash-file-label"></span>
+          </div>
+          <div class="dash-toolbar-right">
+            <input id="ls-search" type="text" class="dash-search" placeholder="Search name, city, email..." />
+            <span id="ls-count" class="dash-count">0 hostels</span>
+          </div>
+        </div>
+
+        <div id="ls-stats" class="dash-stats">
+          <button type="button" class="stat-chip" data-view="lastScrape" data-filter="total" aria-pressed="false">
+            <div class="stat-top"><strong id="ls-stat-total">0</strong><span>Total</span></div>
+          </button>
+          <button type="button" class="stat-chip" data-view="lastScrape" data-filter="withEmail" aria-pressed="false">
+            <div class="stat-top"><strong id="ls-stat-with-email">0</strong><span>With email</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="ls-stat-bar-email"></div></div>
+          </button>
+          <button type="button" class="stat-chip" data-view="lastScrape" data-filter="withPhone" aria-pressed="false">
+            <div class="stat-top"><strong id="ls-stat-with-phone">0</strong><span>With phone</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="ls-stat-bar-phone"></div></div>
+          </button>
+          <button type="button" class="stat-chip" data-view="lastScrape" data-filter="withDm" aria-pressed="false">
+            <div class="stat-top"><strong id="ls-stat-with-dm">0</strong><span>Decision maker</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="ls-stat-bar-dm"></div></div>
+          </button>
+          <button type="button" class="stat-chip" data-view="lastScrape" data-filter="enriched" aria-pressed="false">
+            <div class="stat-top"><strong id="ls-stat-enriched">0</strong><span>Enriched</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="ls-stat-bar-enriched"></div></div>
+          </button>
+          <button type="button" class="stat-chip" data-view="lastScrape" data-filter="withSocial" aria-pressed="false">
+            <div class="stat-top"><strong id="ls-stat-with-social">0</strong><span>Social</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="ls-stat-bar-social"></div></div>
+          </button>
+        </div>
+
+        <div id="ls-empty" class="empty-state">No scrape results yet. Run a scrape to see results here.</div>
+
+        <div id="ls-content" class="dash-content" hidden>
+          <div class="dash-hint" id="ls-hint">Click any row to see full details</div>
+          <div class="dash-master">
+            <div class="dash-table-wrap">
+              <table class="dash-table">
+                <thead>
+                  <tr>
+                    <th class="col-name">Name</th>
+                    <th>City</th>
+                    <th>Data</th>
+                    <th>Email</th>
+                    <th>Channel</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="ls-table-body"></tbody>
+              </table>
+            </div>
+            <div class="dash-table-footer">
+              <span id="ls-footer-count"></span>
+            </div>
+          </div>
+        </div>
+
+        <div id="ls-detail-container" class="dash-detail-container" hidden>
+          <div class="detail-bar">
+            <h3 id="ls-detail-name"></h3>
+            <span id="ls-detail-subtitle" class="detail-subtitle"></span>
+            <button id="ls-detail-close" type="button" class="secondary detail-bar-close">Back to table</button>
+          </div>
+          <div class="detail-body">
+            <div class="detail-section">
+              <h4>Contact</h4>
+              <div class="detail-grid" id="ls-detail-contact"></div>
+            </div>
+            <div class="detail-section">
+              <h4>Decision Maker</h4>
+              <div class="detail-grid" id="ls-detail-dm"></div>
+            </div>
+            <div class="detail-section">
+              <h4>Social Media</h4>
+              <div class="detail-grid" id="ls-detail-social"></div>
+            </div>
+            <div class="detail-section">
+              <h4>Basic Info</h4>
+              <div class="detail-grid" id="ls-detail-basic"></div>
+            </div>
+            <div class="detail-section">
+              <h4>Enrichment</h4>
+              <div class="detail-grid" id="ls-detail-enrichment"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Dashboard -->
       <div id="tab-dashboard" class="tab-content" role="tabpanel" hidden>
         <div class="dash-toolbar">
           <div class="dash-toolbar-left">
@@ -181,28 +278,28 @@
         </div>
 
         <div id="dash-stats" class="dash-stats">
-          <button type="button" class="stat-chip" data-filter="total" aria-pressed="false">
-            <div class="stat-top"><strong id="stat-total">0</strong><span>Total</span></div>
+          <button type="button" class="stat-chip" data-view="dashboard" data-filter="total" aria-pressed="false">
+            <div class="stat-top"><strong id="dash-stat-total">0</strong><span>Total</span></div>
           </button>
-          <button type="button" class="stat-chip" data-filter="withEmail" aria-pressed="false">
-            <div class="stat-top"><strong id="stat-with-email">0</strong><span>With email</span></div>
-            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-email"></div></div>
+          <button type="button" class="stat-chip" data-view="dashboard" data-filter="withEmail" aria-pressed="false">
+            <div class="stat-top"><strong id="dash-stat-with-email">0</strong><span>With email</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="dash-stat-bar-email"></div></div>
           </button>
-          <button type="button" class="stat-chip" data-filter="withPhone" aria-pressed="false">
-            <div class="stat-top"><strong id="stat-with-phone">0</strong><span>With phone</span></div>
-            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-phone"></div></div>
+          <button type="button" class="stat-chip" data-view="dashboard" data-filter="withPhone" aria-pressed="false">
+            <div class="stat-top"><strong id="dash-stat-with-phone">0</strong><span>With phone</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="dash-stat-bar-phone"></div></div>
           </button>
-          <button type="button" class="stat-chip" data-filter="withDm" aria-pressed="false">
-            <div class="stat-top"><strong id="stat-with-dm">0</strong><span>Decision maker</span></div>
-            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-dm"></div></div>
+          <button type="button" class="stat-chip" data-view="dashboard" data-filter="withDm" aria-pressed="false">
+            <div class="stat-top"><strong id="dash-stat-with-dm">0</strong><span>Decision maker</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="dash-stat-bar-dm"></div></div>
           </button>
-          <button type="button" class="stat-chip" data-filter="enriched" aria-pressed="false">
-            <div class="stat-top"><strong id="stat-enriched">0</strong><span>Enriched</span></div>
-            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-enriched"></div></div>
+          <button type="button" class="stat-chip" data-view="dashboard" data-filter="enriched" aria-pressed="false">
+            <div class="stat-top"><strong id="dash-stat-enriched">0</strong><span>Enriched</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="dash-stat-bar-enriched"></div></div>
           </button>
-          <button type="button" class="stat-chip" data-filter="withSocial" aria-pressed="false">
-            <div class="stat-top"><strong id="stat-with-social">0</strong><span>Social</span></div>
-            <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-social"></div></div>
+          <button type="button" class="stat-chip" data-view="dashboard" data-filter="withSocial" aria-pressed="false">
+            <div class="stat-top"><strong id="dash-stat-with-social">0</strong><span>Social</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="dash-stat-bar-social"></div></div>
           </button>
         </div>
 
@@ -237,30 +334,30 @@
 
         <div id="dash-detail-container" class="dash-detail-container" hidden>
           <div class="detail-bar">
-            <h3 id="detail-name"></h3>
-            <span id="detail-subtitle" class="detail-subtitle"></span>
-            <button id="detail-close" type="button" class="secondary detail-bar-close">Back to table</button>
+            <h3 id="dash-detail-name"></h3>
+            <span id="dash-detail-subtitle" class="detail-subtitle"></span>
+            <button id="dash-detail-close" type="button" class="secondary detail-bar-close">Back to table</button>
           </div>
           <div class="detail-body">
             <div class="detail-section">
               <h4>Contact</h4>
-              <div class="detail-grid" id="detail-contact"></div>
+              <div class="detail-grid" id="dash-detail-contact"></div>
             </div>
             <div class="detail-section">
               <h4>Decision Maker</h4>
-              <div class="detail-grid" id="detail-dm"></div>
+              <div class="detail-grid" id="dash-detail-dm"></div>
             </div>
             <div class="detail-section">
               <h4>Social Media</h4>
-              <div class="detail-grid" id="detail-social"></div>
+              <div class="detail-grid" id="dash-detail-social"></div>
             </div>
             <div class="detail-section">
               <h4>Basic Info</h4>
-              <div class="detail-grid" id="detail-basic"></div>
+              <div class="detail-grid" id="dash-detail-basic"></div>
             </div>
             <div class="detail-section">
               <h4>Enrichment</h4>
-              <div class="detail-grid" id="detail-enrichment"></div>
+              <div class="detail-grid" id="dash-detail-enrichment"></div>
             </div>
           </div>
         </div>
@@ -290,6 +387,11 @@
               <li>Set the maximum results per city (default: 20).</li>
               <li>Choose your output format: JSON, CSV, or both.</li>
               <li>Click <strong>Start scrape</strong> and watch the activity log for progress.</li>
+              <li>
+                A preview of the most recent results (up to 200 rows) appears in the
+                <strong>Last Scrape</strong> tab when done. The <strong>Dashboard</strong> tab and exported JSON/CSV
+                files contain the full dataset for larger runs.
+              </li>
             </ol>
           </section>
 
@@ -351,15 +453,43 @@
           </section>
 
           <section>
+            <h3>Tabs</h3>
+            <dl>
+              <dt>Scrape</dt>
+              <dd>Configure and run scrapes. The activity log shows real-time progress.</dd>
+
+              <dt>Last Scrape</dt>
+              <dd>
+                Results from the most recent scrape. Includes stat filters (click any stat chip to filter), search, and
+                a detail view for each listing.
+              </dd>
+
+              <dt>Dashboard</dt>
+              <dd>
+                Automatically loads all <code>hostels-*.json</code> files from your output folder and shows them
+                together with deduplication. Use the <strong>Load JSON</strong> button to add files from other
+                directories.
+              </dd>
+            </dl>
+          </section>
+
+          <section>
             <h3>Tips</h3>
             <ul>
               <li>Start with a small run (1 city, 5&ndash;10 results) to verify everything works before scaling up.</li>
+              <li>
+                Large scrapes (more than 50 results) are automatically split into batches to avoid Google rate limiting.
+                You can request up to 400 results per city.
+              </li>
+              <li>
+                Each run skips listings already saved in your output folder, so you can run multiple small scrapes to
+                gradually build up results without duplicates.
+              </li>
               <li>
                 If a scrape is interrupted, re-running the same cities will resume from the last checkpoint
                 automatically.
               </li>
               <li>All results stay on your machine. No data is sent to any external service or cloud backend.</li>
-              <li>The dashboard shows a live preview. Use the exported file or Load JSON for the full dataset.</li>
             </ul>
           </section>
         </div>

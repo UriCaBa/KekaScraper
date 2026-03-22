@@ -261,17 +261,17 @@ export const tests = [
   },
   // --- timestampLabel ---
   {
-    name: 'timestampLabel returns string matching YYYYMMDD-HHmmss pattern',
+    name: 'timestampLabel returns string matching YYYYMMDD-HHmmss-mmm pattern',
     run: () => {
       const label = timestampLabel();
-      assert.match(label, /^\d{8}-\d{6}$/);
+      assert.match(label, /^\d{8}-\d{6}-\d{3}$/);
     },
   },
   {
-    name: 'timestampLabel formats a specific date correctly',
+    name: 'timestampLabel formats a specific date correctly with milliseconds',
     run: () => {
-      const date = new Date(2025, 0, 15, 9, 5, 3); // Jan 15 2025 09:05:03
-      assert.equal(timestampLabel(date), '20250115-090503');
+      const date = new Date(2025, 0, 15, 9, 5, 3, 42); // Jan 15 2025 09:05:03.042
+      assert.equal(timestampLabel(date), '20250115-090503-042');
     },
   },
   // --- repairMojibake ---
