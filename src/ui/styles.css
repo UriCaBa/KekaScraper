@@ -692,6 +692,19 @@ td a {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    background 200ms ease;
+}
+
+.stat-chip:hover {
+  border-color: var(--accent);
+}
+
+.stat-chip-active {
+  border-color: var(--accent);
+  background: rgba(16, 185, 129, 0.08);
 }
 
 .stat-top {
