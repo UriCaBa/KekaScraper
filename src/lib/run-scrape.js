@@ -69,6 +69,9 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     detailConcurrency: normalizedRunConfig.detailConcurrency,
   };
 
+  // Load previously extracted URLs from existing JSON files in the output directory
+  const previousUrls = await loadPreviousResultUrls(outputDir);
+
   try {
     await mapWithConcurrency(remainingCities, concurrency, async (city) => {
       const cityIndex = normalizedRunConfig.cities.indexOf(city) + 1;
@@ -85,6 +88,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
         const cityRun = await scrapeCity(page, detailPage, {
           ...scrapeCityOptions,
           city,
+          excludeUrls: previousUrls,
           onEvent: emit,
         });
 
@@ -327,4 +331,35 @@ async function deleteCheckpoint(outputDir, runId) {
   } catch {
     // Checkpoint cleanup failure is non-fatal.
   }
+}
+
+export async function loadPreviousResultUrls(outputDir) {
+  const urls = [];
+  let entries;
+  try {
+    entries = await fs.readdir(outputDir);
+  } catch {
+    return urls;
+  }
+
+  const jsonFiles = entries.filter(
+    (entry) => entry.startsWith('hostels-') && entry.endsWith('.json') && !entry.endsWith('-checkpoint.json'),
+  );
+
+  for (const filename of jsonFiles) {
+    try {
+      const data = JSON.parse(await fs.readFile(path.join(outputDir, filename), 'utf8'));
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          if (item?.googleMapsUrl) {
+            urls.push(item.googleMapsUrl);
+          }
+        }
+      }
+    } catch {
+      // Skip unreadable files.
+    }
+  }
+
+  return urls;
 }
