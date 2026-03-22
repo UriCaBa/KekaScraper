@@ -347,7 +347,11 @@ export async function loadPreviousResultUrls(outputDir) {
   }
 
   const jsonFiles = entries.filter(
-    (entry) => entry.isFile() && entry.name.startsWith('hostels-') && entry.name.endsWith('.json') && !entry.name.endsWith('-checkpoint.json'),
+    (entry) =>
+      entry.isFile() &&
+      entry.name.startsWith('hostels-') &&
+      entry.name.endsWith('.json') &&
+      !entry.name.endsWith('-checkpoint.json'),
   );
 
   // Sort by modification time (most recent first) and cap to avoid
