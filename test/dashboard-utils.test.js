@@ -14,6 +14,8 @@ const FULL_LISTING = {
   facebookUrl: null,
   linkedinUrl: null,
   twitterUrl: null,
+  tiktokUrl: null,
+  youtubeUrl: null,
   bestContactValue: 'info@hostal.com',
   website: 'https://hostal.com',
 };
@@ -30,6 +32,8 @@ const EMAIL_ONLY = {
   facebookUrl: null,
   linkedinUrl: null,
   twitterUrl: null,
+  tiktokUrl: null,
+  youtubeUrl: null,
 };
 
 const PHONE_ONLY = {
@@ -44,6 +48,24 @@ const PHONE_ONLY = {
   facebookUrl: 'https://facebook.com/pension',
   linkedinUrl: null,
   twitterUrl: null,
+  tiktokUrl: null,
+  youtubeUrl: null,
+};
+
+const TIKTOK_ONLY = {
+  name: 'Hostal TikTok',
+  searchedCity: 'Sevilla',
+  generalEmail: null,
+  phone: null,
+  websitePhone: null,
+  decisionMakerName: null,
+  websiteScanStatus: 'no-website',
+  instagramUrl: null,
+  facebookUrl: null,
+  linkedinUrl: null,
+  twitterUrl: null,
+  tiktokUrl: 'https://tiktok.com/@hostal',
+  youtubeUrl: null,
 };
 
 const EMPTY_LISTING = {
@@ -58,9 +80,11 @@ const EMPTY_LISTING = {
   facebookUrl: null,
   linkedinUrl: null,
   twitterUrl: null,
+  tiktokUrl: null,
+  youtubeUrl: null,
 };
 
-const ALL_LISTINGS = [FULL_LISTING, EMAIL_ONLY, PHONE_ONLY, EMPTY_LISTING];
+const ALL_LISTINGS = [FULL_LISTING, EMAIL_ONLY, PHONE_ONLY, TIKTOK_ONLY, EMPTY_LISTING];
 
 export const tests = [
   // ── computeStats ──
@@ -68,12 +92,12 @@ export const tests = [
     name: 'computeStats counts all stat categories correctly',
     run: () => {
       const stats = computeStats(ALL_LISTINGS);
-      assert.equal(stats.total, 4);
+      assert.equal(stats.total, 5);
       assert.equal(stats.withEmail, 2, 'FULL + EMAIL_ONLY have generalEmail');
       assert.equal(stats.withPhone, 2, 'FULL has phone, PHONE_ONLY has websitePhone');
       assert.equal(stats.withDm, 1, 'only FULL has decisionMakerName');
       assert.equal(stats.enriched, 2, 'FULL and PHONE_ONLY have websiteScanStatus ok');
-      assert.equal(stats.withSocial, 2, 'FULL has instagram, PHONE_ONLY has facebook');
+      assert.equal(stats.withSocial, 3, 'FULL has instagram, PHONE_ONLY has facebook, TIKTOK_ONLY has tiktok');
     },
   },
   {
@@ -130,6 +154,7 @@ export const tests = [
     run: () => {
       assert.equal(STAT_FILTER_FNS.withSocial(FULL_LISTING), true, 'has instagram');
       assert.equal(STAT_FILTER_FNS.withSocial(PHONE_ONLY), true, 'has facebook');
+      assert.equal(STAT_FILTER_FNS.withSocial(TIKTOK_ONLY), true, 'has tiktok');
       assert.equal(STAT_FILTER_FNS.withSocial(EMAIL_ONLY), false);
       assert.equal(STAT_FILTER_FNS.withSocial(EMPTY_LISTING), false);
     },
@@ -140,7 +165,7 @@ export const tests = [
     name: 'filterResults returns all results when no filter or search',
     run: () => {
       const result = filterResults(ALL_LISTINGS, null, '');
-      assert.equal(result.length, 4);
+      assert.equal(result.length, 5);
     },
   },
   {
@@ -181,7 +206,7 @@ export const tests = [
     name: 'filterResults ignores unknown stat filter names',
     run: () => {
       const result = filterResults(ALL_LISTINGS, 'nonExistentFilter', '');
-      assert.equal(result.length, 4, 'unknown filter returns all results');
+      assert.equal(result.length, 5, 'unknown filter returns all results');
     },
   },
 ];

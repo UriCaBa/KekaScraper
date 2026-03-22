@@ -4,7 +4,8 @@ export const STAT_FILTER_FNS = {
   withPhone: (r) => Boolean(r.phone || r.websitePhone),
   withDm: (r) => Boolean(r.decisionMakerName),
   enriched: (r) => r.websiteScanStatus === 'ok',
-  withSocial: (r) => Boolean(r.instagramUrl || r.facebookUrl || r.linkedinUrl || r.twitterUrl),
+  withSocial: (r) =>
+    Boolean(r.instagramUrl || r.facebookUrl || r.linkedinUrl || r.twitterUrl || r.tiktokUrl || r.youtubeUrl),
 };
 
 export function computeStats(results) {
@@ -13,7 +14,7 @@ export function computeStats(results) {
   const withPhone = results.filter((r) => r.phone || r.websitePhone).length;
   const withDm = results.filter((r) => r.decisionMakerName).length;
   const enriched = results.filter((r) => r.websiteScanStatus === 'ok').length;
-  const withSocial = results.filter((r) => r.instagramUrl || r.facebookUrl || r.linkedinUrl || r.twitterUrl).length;
+  const withSocial = results.filter(STAT_FILTER_FNS.withSocial).length;
   return { total, withEmail, withPhone, withDm, enriched, withSocial };
 }
 

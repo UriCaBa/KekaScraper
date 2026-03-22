@@ -265,7 +265,9 @@ function registerIpcHandlers() {
       return true;
     });
 
-    return { results: deduped, fileCount: jsonFiles.length };
+    const MAX_DASHBOARD_RESULTS = 500;
+    const capped = deduped.slice(0, MAX_DASHBOARD_RESULTS);
+    return { results: capped, totalCount: deduped.length, fileCount: jsonFiles.length };
   });
 
   ipcMain.handle('scrape:open-output-file', async (_, filePath) => {

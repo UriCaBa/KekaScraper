@@ -645,6 +645,7 @@ function getBridge() {
     'openExternalUrl',
     'onScrapeEvent',
     'loadResultsFile',
+    'loadAllResults',
     'pickOutputFolder',
   ]) {
     if (typeof bridge[methodName] !== 'function') {
