@@ -278,7 +278,7 @@ export const tests = [
   {
     name: 'repairMojibake repairs common UTF-8 mojibake patterns',
     run: () => {
-      // "Caf\u00e9" encoded as latin1 then decoded as latin1 gives mojibake
+      // "Caf\u00e9" encoded as UTF-8 then decoded as latin1 gives mojibake
       const mojibake = Buffer.from('Caf\u00e9', 'utf8').toString('latin1');
       const repaired = repairMojibake(mojibake);
       assert.equal(repaired, 'Caf\u00e9');
