@@ -69,8 +69,10 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
     detailConcurrency: normalizedRunConfig.detailConcurrency,
   };
 
-  // Load previously extracted URLs from existing JSON files in the output directory
+  // Build deduplicated exclude list from previous outputs + checkpoint results
   const previousUrls = await loadPreviousResultUrls(outputDir);
+  const checkpointUrls = (checkpoint?.results ?? []).map((r) => r?.googleMapsUrl).filter(Boolean);
+  const excludeUrls = [...new Set([...previousUrls, ...checkpointUrls])];
 
   try {
     await mapWithConcurrency(remainingCities, concurrency, async (city) => {
@@ -88,7 +90,7 @@ export async function runScrape(inputOptions = {}, hooks = {}) {
         const cityRun = await scrapeCity(page, detailPage, {
           ...scrapeCityOptions,
           city,
-          excludeUrls: previousUrls,
+          excludeUrls,
           onEvent: emit,
         });
 
@@ -334,12 +336,12 @@ async function deleteCheckpoint(outputDir, runId) {
 }
 
 export async function loadPreviousResultUrls(outputDir) {
-  const urls = [];
+  const urls = new Set();
   let entries;
   try {
     entries = await fs.readdir(outputDir);
   } catch {
-    return urls;
+    return [];
   }
 
   const jsonFiles = entries.filter(
@@ -352,7 +354,7 @@ export async function loadPreviousResultUrls(outputDir) {
       if (Array.isArray(data)) {
         for (const item of data) {
           if (item?.googleMapsUrl) {
-            urls.push(item.googleMapsUrl);
+            urls.add(item.googleMapsUrl);
           }
         }
       }
@@ -361,5 +363,5 @@ export async function loadPreviousResultUrls(outputDir) {
     }
   }
 
-  return urls;
+  return [...urls];
 }

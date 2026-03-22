@@ -152,10 +152,10 @@ export async function scrapeCity(page, detailPage, options) {
   const searchQueries = buildSearchQueries(queryPrefix, city);
   const seenListingUrls = new Map();
 
-  // Pre-seed with previously extracted URLs so we skip them
+  // Excluded URLs are tracked separately so they don't count toward candidateLimit
+  const excludedUrlKeys = new Set();
   for (const url of excludeUrls) {
-    const key = normalizeMapsUrl(url);
-    seenListingUrls.set(key, { listingUrl: url, searchQuery: null });
+    excludedUrlKeys.add(normalizeMapsUrl(url));
   }
   const results = [];
   const stats = {
@@ -208,11 +208,12 @@ export async function scrapeCity(page, detailPage, options) {
       const newCandidates = [];
       for (const listingUrl of listingUrls) {
         const key = normalizeMapsUrl(listingUrl);
-        if (!seenListingUrls.has(key)) {
-          const candidate = { listingUrl, searchQuery };
-          seenListingUrls.set(key, candidate);
-          newCandidates.push(candidate);
+        if (excludedUrlKeys.has(key) || seenListingUrls.has(key)) {
+          continue;
         }
+        const candidate = { listingUrl, searchQuery };
+        seenListingUrls.set(key, candidate);
+        newCandidates.push(candidate);
 
         if (seenListingUrls.size >= candidateLimit) {
           break;
