@@ -304,6 +304,12 @@ button.secondary:hover:not(:disabled) {
   font-size: 0.8rem;
 }
 
+.requirement-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
 .status-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
