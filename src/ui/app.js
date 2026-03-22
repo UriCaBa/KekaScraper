@@ -273,6 +273,10 @@ async function handleSubmit() {
     state.dashResults = state.results.filter((item) => !isEmptyListing(item));
     state.dashSelectedIndex = -1;
     state.dashFileName = '';
+    state.dashStatFilter = null;
+    state.dashSearchQuery = '';
+    elements.dashSearch.value = '';
+    updateStatChipSelection();
     renderDashboard();
     switchTab('dashboard');
   } catch (error) {
@@ -680,7 +684,9 @@ function getFilteredDashResults() {
 
 function updateStatChipSelection() {
   for (const chip of document.querySelectorAll('.stat-chip[data-filter]')) {
-    chip.classList.toggle('stat-chip-active', chip.dataset.filter === state.dashStatFilter);
+    const isActive = chip.dataset.filter === state.dashStatFilter;
+    chip.classList.toggle('stat-chip-active', isActive);
+    chip.setAttribute('aria-pressed', String(isActive));
   }
 }
 

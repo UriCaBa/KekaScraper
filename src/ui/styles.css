@@ -693,6 +693,9 @@ td a {
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
   cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   transition:
     border-color 200ms ease,
     background 200ms ease;

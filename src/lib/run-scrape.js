@@ -335,22 +335,42 @@ async function deleteCheckpoint(outputDir, runId) {
   }
 }
 
+const PREVIOUS_RESULT_FILES_LIMIT = 50;
+
 export async function loadPreviousResultUrls(outputDir) {
   const urls = new Set();
   let entries;
   try {
-    entries = await fs.readdir(outputDir);
+    entries = await fs.readdir(outputDir, { withFileTypes: true });
   } catch {
     return [];
   }
 
   const jsonFiles = entries.filter(
-    (entry) => entry.startsWith('hostels-') && entry.endsWith('.json') && !entry.endsWith('-checkpoint.json'),
+    (entry) => entry.isFile() && entry.name.startsWith('hostels-') && entry.name.endsWith('.json') && !entry.name.endsWith('-checkpoint.json'),
   );
 
-  for (const filename of jsonFiles) {
+  // Sort by modification time (most recent first) and cap to avoid
+  // excessive memory/startup time in directories with many output files.
+  const withStats = await Promise.all(
+    jsonFiles.map(async (entry) => {
+      try {
+        const stat = await fs.stat(path.join(outputDir, entry.name));
+        return { name: entry.name, mtimeMs: stat.mtimeMs };
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  const sorted = withStats
+    .filter(Boolean)
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .slice(0, PREVIOUS_RESULT_FILES_LIMIT);
+
+  for (const { name } of sorted) {
     try {
-      const data = JSON.parse(await fs.readFile(path.join(outputDir, filename), 'utf8'));
+      const data = JSON.parse(await fs.readFile(path.join(outputDir, name), 'utf8'));
       if (Array.isArray(data)) {
         for (const item of data) {
           if (item?.googleMapsUrl) {

@@ -95,12 +95,7 @@ const RATE_LIMIT_BASE_COOLDOWN_MS = 30000;
 const RATE_LIMIT_MAX_COOLDOWN_MS = 120000;
 
 async function detectBlockage(page) {
-  const bodyText = await page
-    .locator('body')
-    .first()
-    .innerText({ timeout: 3000 })
-    .catch(() => '');
-
+  // Check CAPTCHA iframe first — cheapest selector-based check.
   if (
     await page
       .locator('iframe[src*="recaptcha"], iframe[src*="captcha"]')
@@ -109,6 +104,13 @@ async function detectBlockage(page) {
   ) {
     throw new Error('Google rate-limit detected: CAPTCHA present');
   }
+
+  // innerText is expensive on large DOMs — only fetch when needed.
+  const bodyText = await page
+    .locator('body')
+    .first()
+    .innerText({ timeout: 3000 })
+    .catch(() => '');
 
   if (/unusual traffic|automated queries|sorry.*can.?t process/i.test(bodyText)) {
     throw new Error('Google rate-limit detected: unusual traffic warning');
