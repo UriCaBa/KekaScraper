@@ -230,7 +230,7 @@ async function bootstrap() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       const activeView = state.activeTab === 'last-scrape' ? lastScrapeView : dashboardView;
-      if (!activeView.elements.detailContainer?.hidden) {
+      if (activeView.elements.detailContainer && !activeView.elements.detailContainer.hidden) {
         closeViewDetail(activeView);
       }
     }
@@ -866,43 +866,44 @@ function renderViewDetail(view, item) {
 
   // Social Media
   const socialContainer = el.detailSocial;
-  if (!socialContainer) return;
-  socialContainer.replaceChildren();
-  const socialEntries = [
-    ['Instagram', item.instagramUrl],
-    ['Facebook', item.facebookUrl],
-    ['LinkedIn', item.linkedinUrl],
-    ['Twitter/X', item.twitterUrl],
-    ['TikTok', item.tiktokUrl],
-    ['YouTube', item.youtubeUrl],
-  ];
+  if (socialContainer) {
+    socialContainer.replaceChildren();
+    const socialEntries = [
+      ['Instagram', item.instagramUrl],
+      ['Facebook', item.facebookUrl],
+      ['LinkedIn', item.linkedinUrl],
+      ['Twitter/X', item.twitterUrl],
+      ['TikTok', item.tiktokUrl],
+      ['YouTube', item.youtubeUrl],
+    ];
 
-  const linksDiv = document.createElement('div');
-  linksDiv.className = 'social-links';
-  let hasSocial = false;
+    const linksDiv = document.createElement('div');
+    linksDiv.className = 'social-links';
+    let hasSocial = false;
 
-  for (const [label, url] of socialEntries) {
-    if (!url) {
-      continue;
+    for (const [label, url] of socialEntries) {
+      if (!url) {
+        continue;
+      }
+      hasSocial = true;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary social-link';
+      button.textContent = label;
+      button.addEventListener('click', async () => {
+        await runUiAction(() => getBridge().openExternalUrl(url), `Failed to open ${label}`);
+      });
+      linksDiv.append(button);
     }
-    hasSocial = true;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'secondary social-link';
-    button.textContent = label;
-    button.addEventListener('click', async () => {
-      await runUiAction(() => getBridge().openExternalUrl(url), `Failed to open ${label}`);
-    });
-    linksDiv.append(button);
-  }
 
-  if (!hasSocial) {
-    const empty = document.createElement('div');
-    empty.className = 'detail-value empty';
-    empty.textContent = '\u2013';
-    socialContainer.append(empty);
-  } else {
-    socialContainer.append(linksDiv);
+    if (!hasSocial) {
+      const empty = document.createElement('div');
+      empty.className = 'detail-value empty';
+      empty.textContent = '\u2013';
+      socialContainer.append(empty);
+    } else {
+      socialContainer.append(linksDiv);
+    }
   }
 
   // Basic Info
