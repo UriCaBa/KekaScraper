@@ -106,7 +106,7 @@ export async function scrapeCity(page, detailPage, options) {
   } = options;
   const emit = typeof onEvent === 'function' ? onEvent : () => {};
 
-  const candidateCap = Math.max(220, resultLimit + Math.min(resultLimit, 200));
+  const candidateCap = Math.min(600, Math.max(220, resultLimit + Math.min(resultLimit, 200)));
   const candidateLimit = Math.min(Math.max(resultLimit * 10, resultLimit + 32), candidateCap);
   const searchQueries = buildSearchQueries(queryPrefix, city);
   const seenListingUrls = new Map();

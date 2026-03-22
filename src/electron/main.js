@@ -299,14 +299,14 @@ function normalizeFormState(rawFormState = {}) {
 
   return {
     citiesText,
-    resultLimit: normalizeInteger(formState.resultLimit, defaultConfig.resultLimit, 'resultLimit'),
+    resultLimit: normalizeInteger(formState.resultLimit, defaultConfig.resultLimit, 'resultLimit', { max: 400 }),
     formats,
     browserChannel,
     headful: normalizeBoolean(formState.headful, !defaultConfig.headless),
     enrichWebsite: normalizeBoolean(formState.enrichWebsite, defaultConfig.enrichWebsite),
     websitePageLimit: normalizeInteger(formState.websitePageLimit, defaultConfig.websitePageLimit, 'websitePageLimit'),
     concurrency: normalizeInteger(formState.concurrency, 1, 'concurrency', { min: 1 }),
-    detailConcurrency: normalizeInteger(formState.detailConcurrency, 1, 'detailConcurrency', { min: 1 }),
+    detailConcurrency: normalizeInteger(formState.detailConcurrency, 1, 'detailConcurrency', { min: 1, max: 6 }),
     proxy: typeof formState.proxy === 'string' ? formState.proxy.trim() : '',
   };
 }
