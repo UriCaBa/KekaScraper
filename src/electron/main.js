@@ -258,8 +258,10 @@ function registerIpcHandlers() {
 
     const seen = new Set();
     const deduped = allItems.filter((item) => {
-      if (!item.googleMapsUrl || seen.has(item.googleMapsUrl)) return false;
-      seen.add(item.googleMapsUrl);
+      const url = item.googleMapsUrl;
+      if (!url) return true;
+      if (seen.has(url)) return false;
+      seen.add(url);
       return true;
     });
 
@@ -431,10 +433,7 @@ async function runScrapeBatched(runConfig) {
   const batchFormats = runConfig.formats.includes('json') ? runConfig.formats : [...runConfig.formats, 'json'];
 
   for (let batch = 0; batch < batchCount; batch++) {
-    const remaining = totalRequested - allResults.length;
-    if (remaining <= 0) break;
-
-    const batchLimit = Math.min(BATCH_SIZE, remaining);
+    const batchLimit = Math.min(BATCH_SIZE, totalRequested - batch * BATCH_SIZE);
 
     sendScrapeEvent({
       type: RUN_EVENT_TYPES.BATCH_STARTED,
