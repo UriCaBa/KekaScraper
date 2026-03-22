@@ -306,8 +306,10 @@ button.secondary:hover:not(:disabled) {
 
 .requirement-note {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-style: italic;
+  margin: 0;
+  text-align: center;
 }
 
 .status-grid {
