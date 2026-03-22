@@ -49,6 +49,8 @@ Reusable local scraper for Google Maps hostel searches by city, with both a CLI 
   - the desktop app writes to your Documents folder under `KekaScraper/output`
 - Includes a local Electron desktop app for non-technical users targeting Windows and macOS
 - Supports resumable scraping with automatic checkpoints for multi-city runs
+- Auto-splits large scrapes (>50 results) into sequential batches to avoid rate limiting
+- Incremental scraping: skips previously extracted listings across runs automatically
 - Concurrent city processing for faster multi-city scrapes
 - Optional proxy routing for all browser traffic
 - Geo-coordinate targeting for geographically precise searches
@@ -89,6 +91,14 @@ The desktop app stores exported results in your Documents folder under `KekaScra
 It defaults to JSON output to match the CLI. Enable CSV explicitly in the form when you need it.
 Website enrichment in the desktop app scans hostel sites automatically; there is no separate per-site page limit field in the UI.
 Current packaged desktop builds are configured around system browsers. For the smoothest first-run experience on client machines, keep Microsoft Edge or Google Chrome installed and use `Auto`, `Microsoft Edge`, or `Google Chrome` in the app.
+
+The desktop app has three tabs:
+
+- **Scrape** — form and activity log for running scrapes
+- **Last Scrape** — results from the most recent scrape, with stat filters, search, and detail view
+- **Dashboard** — automatically loads and deduplicates all `hostels-*.json` files from the output folder, giving a cumulative view of all scraping runs. Use the "Load JSON" button to add files from other directories.
+
+Large scrapes are handled automatically: requesting more than 50 results per city splits the work into sequential batches of 50, with each batch excluding previously extracted listings. This avoids Google rate limiting without manual intervention.
 
 ## CLI usage
 

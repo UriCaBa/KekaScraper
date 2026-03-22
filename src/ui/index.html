@@ -384,6 +384,10 @@
               <li>Set the maximum results per city (default: 20).</li>
               <li>Choose your output format: JSON, CSV, or both.</li>
               <li>Click <strong>Start scrape</strong> and watch the activity log for progress.</li>
+              <li>
+                Results appear in the <strong>Last Scrape</strong> tab when done. The <strong>Dashboard</strong> tab
+                shows all accumulated results from your output folder.
+              </li>
             </ol>
           </section>
 
@@ -445,15 +449,43 @@
           </section>
 
           <section>
+            <h3>Tabs</h3>
+            <dl>
+              <dt>Scrape</dt>
+              <dd>Configure and run scrapes. The activity log shows real-time progress.</dd>
+
+              <dt>Last Scrape</dt>
+              <dd>
+                Results from the most recent scrape. Includes stat filters (click any stat chip to filter), search, and
+                a detail view for each listing.
+              </dd>
+
+              <dt>Dashboard</dt>
+              <dd>
+                Automatically loads all <code>hostels-*.json</code> files from your output folder and shows them
+                together with deduplication. Use the <strong>Load JSON</strong> button to add files from other
+                directories.
+              </dd>
+            </dl>
+          </section>
+
+          <section>
             <h3>Tips</h3>
             <ul>
               <li>Start with a small run (1 city, 5&ndash;10 results) to verify everything works before scaling up.</li>
+              <li>
+                Large scrapes (more than 50 results) are automatically split into batches to avoid Google rate limiting.
+                You can request up to 400 results per city.
+              </li>
+              <li>
+                Each run skips listings already saved in your output folder, so you can run multiple small scrapes to
+                gradually build up results without duplicates.
+              </li>
               <li>
                 If a scrape is interrupted, re-running the same cities will resume from the last checkpoint
                 automatically.
               </li>
               <li>All results stay on your machine. No data is sent to any external service or cloud backend.</li>
-              <li>The dashboard shows a live preview. Use the exported file or Load JSON for the full dataset.</li>
             </ul>
           </section>
         </div>
