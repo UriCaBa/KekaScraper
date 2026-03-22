@@ -401,8 +401,7 @@ function updateLimitWarnings() {
   const detailConc = Number.parseInt(elements.detailConcurrency.value, 10) || 0;
 
   if (limit > SAFE_RESULT_LIMIT) {
-    elements.resultLimitHelp.textContent =
-      `Warning: above ${SAFE_RESULT_LIMIT} results is much slower and very likely to trigger rate limits without a proxy. Use at your own risk.`;
+    elements.resultLimitHelp.textContent = `Warning: above ${SAFE_RESULT_LIMIT} results is much slower and very likely to trigger rate limits without a proxy. Use at your own risk.`;
     elements.resultLimitHelp.classList.add('warning');
   } else {
     elements.resultLimitHelp.textContent =
@@ -411,12 +410,10 @@ function updateLimitWarnings() {
   }
 
   if (detailConc > SAFE_DETAIL_CONCURRENCY) {
-    elements.detailConcurrencyHelp.textContent =
-      `Warning: above ${SAFE_DETAIL_CONCURRENCY} parallel listings significantly increases rate-limit and blocking risk. Use at your own risk.`;
+    elements.detailConcurrencyHelp.textContent = `Warning: above ${SAFE_DETAIL_CONCURRENCY} parallel listings significantly increases rate-limit and blocking risk. Use at your own risk.`;
     elements.detailConcurrencyHelp.classList.add('warning');
   } else {
-    elements.detailConcurrencyHelp.textContent =
-      'Recommended 1-2. 3 is faster but increases rate-limit risk.';
+    elements.detailConcurrencyHelp.textContent = 'Recommended 1-2. 3 is faster but increases rate-limit risk.';
     elements.detailConcurrencyHelp.classList.remove('warning');
   }
 }
