@@ -95,8 +95,8 @@ Current packaged desktop builds are configured around system browsers. For the s
 The desktop app has three tabs:
 
 - **Scrape** — form and activity log for running scrapes
-- **Last Scrape** — results from the most recent scrape, with stat filters, search, and detail view
-- **Dashboard** — automatically loads and deduplicates all `hostels-*.json` files from the output folder, giving a cumulative view of all scraping runs. Use the "Load JSON" button to add files from other directories.
+- **Last Scrape** — preview of results from the most recent scrape (up to 200 rows), with stat filters, search, and detail view
+- **Dashboard** — automatically loads and deduplicates all `hostels-*.json` files from the output folder, giving a cumulative view of all scraping runs. Use the "Load JSON" button to add files from other directories. For large scrapes, the Dashboard and exported JSON/CSV files contain the full dataset.
 
 Large scrapes are handled automatically: requesting more than 50 results per city splits the work into sequential batches of 50, with each batch excluding previously extracted listings. This avoids Google rate limiting without manual intervention.
 

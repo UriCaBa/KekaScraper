@@ -140,6 +140,7 @@ try {
         openOutputFile: async () => {},
         openExternalUrl: async () => {},
         loadResultsFile: async () => null,
+        loadAllResults: async () => ({ results: [], fileCount: 0 }),
         pickOutputFolder: async () => null,
         onScrapeEvent: (handler) => {
           listeners.add(handler);

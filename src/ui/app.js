@@ -190,8 +190,8 @@ async function bootstrap() {
 
   // Tab navigation
   for (const button of elements.tabButtons) {
-    button.addEventListener('click', () => {
-      switchTab(button.dataset.tab);
+    button.addEventListener('click', async () => {
+      await switchTab(button.dataset.tab);
     });
   }
 
@@ -325,7 +325,7 @@ async function handleSubmit() {
     renderView(lastScrapeView);
     // Invalidate dashboard so it reloads with new data on next visit
     dashboardView.loaded = false;
-    switchTab('last-scrape');
+    await switchTab('last-scrape');
   } catch (error) {
     appendLog(error.message, 'error');
     elements.statusCopy.textContent = error.message;
