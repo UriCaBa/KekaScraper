@@ -53,6 +53,8 @@ const elements = {
   concurrency: document.querySelector('#concurrency'),
   detailConcurrency: document.querySelector('#detail-concurrency'),
   proxy: document.querySelector('#proxy'),
+  resultLimitHelp: document.querySelector('#result-limit-help'),
+  detailConcurrencyHelp: document.querySelector('#detail-concurrency-help'),
   pickOutputFolderButton: document.querySelector('#pick-output-folder'),
   openHelpButton: document.querySelector('#open-help'),
   closeHelpButton: document.querySelector('#close-help'),
@@ -127,6 +129,10 @@ async function bootstrap() {
   for (const checkbox of elements.formatCheckboxes) {
     checkbox.addEventListener('change', syncFormatSelection);
   }
+
+  elements.resultLimit.addEventListener('input', updateLimitWarnings);
+  elements.detailConcurrency.addEventListener('input', updateLimitWarnings);
+  updateLimitWarnings();
 
   elements.openOutputFolderButton.addEventListener('click', async () => {
     if (state.outputDirectory) {
@@ -385,6 +391,34 @@ function renderStatus() {
 
 function renderResults() {
   // Results are now shown in the Dashboard tab — this is a no-op for backward compat.
+}
+
+const SAFE_RESULT_LIMIT = 100;
+const SAFE_DETAIL_CONCURRENCY = 3;
+
+function updateLimitWarnings() {
+  const limit = Number.parseInt(elements.resultLimit.value, 10) || 0;
+  const detailConc = Number.parseInt(elements.detailConcurrency.value, 10) || 0;
+
+  if (limit > SAFE_RESULT_LIMIT) {
+    elements.resultLimitHelp.textContent =
+      `Warning: above ${SAFE_RESULT_LIMIT} results is much slower and very likely to trigger rate limits without a proxy. Use at your own risk.`;
+    elements.resultLimitHelp.classList.add('warning');
+  } else {
+    elements.resultLimitHelp.textContent =
+      'Recommended 20-50. Above 50 is slower and may trigger rate limits without a proxy.';
+    elements.resultLimitHelp.classList.remove('warning');
+  }
+
+  if (detailConc > SAFE_DETAIL_CONCURRENCY) {
+    elements.detailConcurrencyHelp.textContent =
+      `Warning: above ${SAFE_DETAIL_CONCURRENCY} parallel listings significantly increases rate-limit and blocking risk. Use at your own risk.`;
+    elements.detailConcurrencyHelp.classList.add('warning');
+  } else {
+    elements.detailConcurrencyHelp.textContent =
+      'Recommended 1-2. 3 is faster but increases rate-limit risk.';
+    elements.detailConcurrencyHelp.classList.remove('warning');
+  }
 }
 
 function populateForm(formState) {

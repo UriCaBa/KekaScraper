@@ -89,7 +89,7 @@ const STREET_TOKENS = new Set([
   'way',
 ]);
 
-export const MAX_DETAIL_CONCURRENCY = 3;
+export const MAX_DETAIL_CONCURRENCY = 6;
 
 export async function scrapeCity(page, detailPage, options) {
   const {
@@ -106,7 +106,8 @@ export async function scrapeCity(page, detailPage, options) {
   } = options;
   const emit = typeof onEvent === 'function' ? onEvent : () => {};
 
-  const candidateLimit = Math.min(Math.max(resultLimit * 10, resultLimit + 32), 220);
+  const candidateCap = Math.max(220, resultLimit + Math.min(resultLimit, 200));
+  const candidateLimit = Math.min(Math.max(resultLimit * 10, resultLimit + 32), candidateCap);
   const searchQueries = buildSearchQueries(queryPrefix, city);
   const seenListingUrls = new Map();
   const results = [];

@@ -229,7 +229,7 @@ Options:
   --proxy "http://u:p@host:port"  Route traffic through a proxy
   --resume                 Resume the last interrupted run
   --concurrency 3          Process N cities in parallel (default 1)
-  --detail-concurrency 3   Extract N listings in parallel within a city (default 1, max 3)
+  --detail-concurrency 3   Extract N listings in parallel within a city (default 1, max 6)
   --help                   Show this help
 `);
 }

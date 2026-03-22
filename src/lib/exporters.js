@@ -17,7 +17,9 @@ export async function writeOutputs(items, options) {
 
   if (formats.includes('csv')) {
     const csvPath = path.join(outputDir, `${baseFilename}.csv`);
-    await fs.writeFile(csvPath, `${toCsv(items)}\n`, 'utf8');
+    // UTF-8 BOM so Windows Excel detects encoding correctly
+    const BOM = '\uFEFF';
+    await fs.writeFile(csvPath, `${BOM}${toCsv(items)}\n`, 'utf8');
     outputFiles.push(csvPath);
   }
 
