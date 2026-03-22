@@ -16,6 +16,7 @@ export const RUN_EVENT_TYPES = Object.freeze({
   ENRICHMENT_ITEM_COMPLETED: 'enrichment-item-completed',
   ENRICHMENT_ITEM_FAILED: 'enrichment-item-failed',
   WEBSITE_PAGE_SKIPPED: 'website-page-skipped',
+  BATCH_STARTED: 'batch-started',
   RUN_COMPLETED: 'run-completed',
 });
 

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import process from 'node:process';
-import { access, mkdir, readFile, realpath, stat } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { defaultConfig } from '../config.js';
@@ -225,6 +225,42 @@ function registerIpcHandlers() {
     };
   });
 
+  ipcMain.handle('app:load-all-results', async () => {
+    const outputDir = getDesktopOutputDirectory();
+    let entries;
+    try {
+      entries = await readdir(outputDir, { withFileTypes: true });
+    } catch {
+      return { results: [], fileCount: 0 };
+    }
+
+    const jsonFiles = entries.filter(
+      (e) =>
+        e.isFile() && e.name.startsWith('hostels-') && e.name.endsWith('.json') && !e.name.endsWith('-checkpoint.json'),
+    );
+
+    const allItems = [];
+    for (const entry of jsonFiles) {
+      try {
+        const data = JSON.parse(await readFile(path.join(outputDir, entry.name), 'utf8'));
+        if (Array.isArray(data)) {
+          allItems.push(...data.filter((item) => item && typeof item === 'object' && !Array.isArray(item)));
+        }
+      } catch {
+        // Skip unreadable files.
+      }
+    }
+
+    const seen = new Set();
+    const deduped = allItems.filter((item) => {
+      if (!item.googleMapsUrl || seen.has(item.googleMapsUrl)) return false;
+      seen.add(item.googleMapsUrl);
+      return true;
+    });
+
+    return { results: deduped, fileCount: jsonFiles.length };
+  });
+
   ipcMain.handle('scrape:open-output-file', async (_, filePath) => {
     const outputFileCheck = await validateOutputFilePath(filePath);
     if (!outputFileCheck.ok) {
@@ -364,16 +400,56 @@ function buildRunConfig(formState) {
   };
 }
 
+const BATCH_SIZE = 50;
+
 function startDesktopScrape(runConfig) {
   if (isSmokeMode) {
     return runSmokeScrape(runConfig);
   }
 
-  return runScrape(runConfig, {
-    onEvent: (event) => {
-      sendScrapeEvent(event);
-    },
-  });
+  if (runConfig.resultLimit <= BATCH_SIZE) {
+    return runScrape(runConfig, { onEvent: sendScrapeEvent });
+  }
+
+  return runScrapeBatched(runConfig);
+}
+
+async function runScrapeBatched(runConfig) {
+  const totalRequested = runConfig.resultLimit;
+  const batchCount = Math.ceil(totalRequested / BATCH_SIZE);
+  let allResults = [];
+  let lastSummary = null;
+  let lastOutputFiles = [];
+
+  for (let batch = 0; batch < batchCount; batch++) {
+    const remaining = totalRequested - allResults.length;
+    if (remaining <= 0) break;
+
+    const batchLimit = Math.min(BATCH_SIZE, remaining);
+
+    sendScrapeEvent({
+      type: RUN_EVENT_TYPES.BATCH_STARTED,
+      timestamp: new Date().toISOString(),
+      batch: batch + 1,
+      totalBatches: batchCount,
+      batchLimit,
+    });
+
+    const result = await runScrape({ ...runConfig, resultLimit: batchLimit }, { onEvent: sendScrapeEvent });
+
+    allResults.push(...result.results);
+    lastSummary = result.summary;
+    lastOutputFiles.push(...result.outputFiles);
+
+    if (result.results.length === 0) break;
+  }
+
+  return {
+    config: runConfig,
+    summary: { ...lastSummary, totalResults: allResults.length, outputFiles: lastOutputFiles },
+    results: allResults,
+    outputFiles: lastOutputFiles,
+  };
 }
 
 function getDesktopOutputDirectory() {
