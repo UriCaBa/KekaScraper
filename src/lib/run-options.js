@@ -144,7 +144,24 @@ function normalizeProxy(input) {
     };
   } catch (error) {
     if (error.message.includes('Proxy protocol')) throw error;
-    throw new Error(`Invalid proxy URL: ${raw}`, { cause: error });
+    throw new Error(`Invalid proxy URL: ${sanitizeProxyForLogging(raw)}`, { cause: error });
+  }
+}
+
+function sanitizeProxyForLogging(raw) {
+  try {
+    const url = new URL(raw);
+    url.username = '';
+    url.password = '';
+    return url.toString();
+  } catch {
+    // Return a redacted form that strips potential credentials (before @)
+    // but preserves the host portion for actionable error messages.
+    const value = String(raw).trim();
+    if (!value) return '<empty>';
+    const atIndex = value.lastIndexOf('@');
+    if (atIndex === -1) return value;
+    return `<redacted>@${value.slice(atIndex + 1)}`;
   }
 }
 

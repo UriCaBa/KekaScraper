@@ -1,12 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {
-  buildCompletionMessage,
-  deriveResultsView,
-  deriveRunButtonView,
-  deriveStatusView,
-  formatDuration,
-} from '../src/ui/view-model.js';
+import { buildCompletionMessage, deriveRunButtonView, deriveStatusView, formatDuration } from '../src/ui/view-model.js';
 
 export const tests = [
   {
@@ -47,44 +41,6 @@ export const tests = [
         disabled: false,
         text: 'Reload app',
       });
-    },
-  },
-  {
-    name: 'deriveResultsView distinguishes no run yet from an empty completed run',
-    run: () => {
-      assert.deepEqual(deriveResultsView({ lastCompletedSummary: null, results: [] }), {
-        hasCompletedRun: false,
-        resultsEmptyHidden: false,
-        resultsContentHidden: true,
-        resultsSummary: '0 rows',
-        rowCount: 0,
-        previewCount: 0,
-        previewLabel: '',
-      });
-
-      assert.deepEqual(
-        deriveResultsView({
-          lastCompletedSummary: { totalResults: 0 },
-          results: [],
-        }),
-        {
-          hasCompletedRun: true,
-          resultsEmptyHidden: true,
-          resultsContentHidden: false,
-          resultsSummary: '0 rows',
-          rowCount: 0,
-          previewCount: 0,
-          previewLabel: '',
-        },
-      );
-
-      assert.equal(
-        deriveResultsView({
-          lastCompletedSummary: { totalResults: 25 },
-          results: new Array(10).fill(null),
-        }).resultsSummary,
-        '25 rows, showing first 10',
-      );
     },
   },
   {

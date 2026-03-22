@@ -5,6 +5,7 @@ import {
   normalizeWhitespace,
   parseNumber,
   retry,
+  stripDiacriticsAndLower,
   uniqueNonEmpty,
 } from './utils.js';
 import { emitRunEvent, RUN_EVENT_TYPES } from './run-events.js';
@@ -184,6 +185,9 @@ async function enrichFromWebsite(listing, options, hooks = {}) {
   });
   const now = new Date().toISOString();
 
+  // Output aliases: hostelEmail and publicDecisionMaker* are legacy field names
+  // kept for backwards compatibility with existing CSV consumers.
+  // Canonical fields are: generalEmail and decisionMaker*.
   return {
     hostelEmail: generalEmail,
     generalEmail,
@@ -305,6 +309,7 @@ async function fetchHtmlPage(url, options) {
       html = await response.text();
     }
     const lines = htmlToLines(html);
+    const linesText = lines.join(' ');
 
     return {
       sourceUrl: url,
@@ -313,13 +318,15 @@ async function fetchHtmlPage(url, options) {
       lines,
       hasForm: /<form\b/i.test(html),
       anchors: extractAnchors(html, response.url),
-      emails: mergeEmailSources(extractEmails(html), extractEmails(lines.join(' ')), extractMailtoEmails(html)),
-      phones: extractPhones(lines.join(' ')),
+      emails: mergeEmailSources(extractEmails(linesText), extractMailtoEmails(html)),
+      phones: extractPhones(linesText),
     };
   } finally {
     clearTimeout(timeout);
   }
 }
+
+const CRAWL_CONCURRENCY = 2;
 
 async function crawlWebsite(homepage, options, onEvent = () => {}) {
   const maxPages = Math.max(1, options.websitePageLimit);
@@ -330,40 +337,52 @@ async function crawlWebsite(homepage, options, onEvent = () => {}) {
 
   while (scannedPages.length < maxPages && queue.length) {
     queue.sort((left, right) => right.score - left.score || left.url.length - right.url.length);
-    const next = queue.shift();
 
-    if (!next) {
-      break;
+    // Pick up to CRAWL_CONCURRENCY unique URLs from the front of the queue
+    const batch = [];
+    while (batch.length < CRAWL_CONCURRENCY && queue.length && scannedPages.length + batch.length < maxPages) {
+      const next = queue.shift();
+      if (!next) break;
+
+      const pageKey = normalizePageKey(next.url);
+      if (visited.has(pageKey)) continue;
+
+      visited.add(pageKey);
+      batch.push({ url: next.url, pageKey });
     }
 
-    const pageKey = normalizePageKey(next.url);
-    if (visited.has(pageKey)) {
-      continue;
-    }
+    if (batch.length === 0) break;
 
-    visited.add(pageKey);
+    const results = await Promise.allSettled(
+      batch.map(async ({ url, pageKey }) => {
+        const page = await fetchHtmlPage(url, options);
+        return { page, pageKey };
+      }),
+    );
 
-    try {
-      const page = await fetchHtmlPage(next.url, options);
-      scannedPages.push(page);
-      mergeSocialLinks(socialLinks, extractSocialLinks(page.anchors));
+    for (const [i, result] of results.entries()) {
+      if (result.status === 'fulfilled') {
+        const { page, pageKey } = result.value;
+        scannedPages.push(page);
+        mergeSocialLinks(socialLinks, extractSocialLinks(page.anchors));
 
-      const finalKey = normalizePageKey(page.finalUrl);
-      if (finalKey !== pageKey) {
-        visited.add(finalKey);
-      }
-
-      for (const candidate of scoreAnchors(homepage.finalUrl, page.anchors)) {
-        if (!visited.has(normalizePageKey(candidate.url))) {
-          queue.push(candidate);
+        const finalKey = normalizePageKey(page.finalUrl);
+        if (finalKey !== pageKey) {
+          visited.add(finalKey);
         }
+
+        for (const candidate of scoreAnchors(homepage.finalUrl, page.anchors)) {
+          if (!visited.has(normalizePageKey(candidate.url))) {
+            queue.push(candidate);
+          }
+        }
+      } else {
+        emitRunEvent(onEvent, RUN_EVENT_TYPES.WEBSITE_PAGE_SKIPPED, {
+          sourceUrl: homepage.finalUrl,
+          url: batch[i].url,
+          message: result.reason?.message ?? 'Unknown error',
+        });
       }
-    } catch (error) {
-      emitRunEvent(onEvent, RUN_EVENT_TYPES.WEBSITE_PAGE_SKIPPED, {
-        sourceUrl: homepage.finalUrl,
-        url: next.url,
-        message: error.message,
-      });
     }
   }
 
@@ -786,10 +805,7 @@ function normalizeDomainRoot(domain) {
 }
 
 function buildListingTokens(value) {
-  return normalizeWhitespace(value ?? '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+  return stripDiacriticsAndLower(normalizeWhitespace(value ?? ''))
     .split(/[^a-z0-9]+/)
     .filter((token) => token.length >= 3);
 }

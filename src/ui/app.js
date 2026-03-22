@@ -1,5 +1,7 @@
 import { RUN_EVENT_TYPES } from '../lib/run-events.js';
 import { countUniqueCities, normalizePublicUrl } from '../shared/input-normalization.js';
+import { formatListingSkipReason } from '../shared/event-formatting.js';
+import { isEmptyListing } from '../shared/listing-utils.js';
 import {
   buildCompletionMessage as formatCompletionMessage,
   deriveRunButtonView,
@@ -251,7 +253,7 @@ async function handleSubmit() {
     appendLog(formatCompletionMessage(result.summary));
 
     // Push results to dashboard and auto-switch (filter phantom listings)
-    state.dashResults = state.results.filter((item) => !isPhantomListing(item));
+    state.dashResults = state.results.filter((item) => !isEmptyListing(item));
     state.dashSelectedIndex = -1;
     state.dashFileName = '';
     renderDashboard();
@@ -557,17 +559,6 @@ function getBridge() {
   return bridge;
 }
 
-function formatListingSkipReason(event) {
-  const scoreText = typeof event.score === 'number' ? `score=${event.score}` : null;
-  const signals = [
-    ...(Array.isArray(event.positiveSignals) ? event.positiveSignals : []),
-    ...(Array.isArray(event.negativeSignals) ? event.negativeSignals : []),
-  ];
-  return [event.reason ?? 'skipped', scoreText, signals.length ? `signals=${signals.join(',')}` : null]
-    .filter(Boolean)
-    .join(' | ');
-}
-
 // ── Dashboard ──
 
 function closeDashDetail() {
@@ -576,17 +567,13 @@ function closeDashDetail() {
   elements.dashContent.hidden = false;
 }
 
-function isPhantomListing(item) {
-  return !item.address && !item.website && !item.phone && !item.category;
-}
-
 async function handleLoadResults() {
   const data = await getBridge().loadResultsFile();
   if (!data) {
     return;
   }
 
-  const filtered = data.results.filter((item) => !isPhantomListing(item));
+  const filtered = data.results.filter((item) => !isEmptyListing(item));
   state.dashResults = filtered.slice(0, DASH_ROW_LIMIT);
   if (filtered.length > DASH_ROW_LIMIT) {
     appendLog(

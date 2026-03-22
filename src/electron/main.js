@@ -1,6 +1,6 @@
 import path from 'node:path';
 import process from 'node:process';
-import { access, mkdir, readFile, realpath } from 'node:fs/promises';
+import { access, mkdir, readFile, realpath, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { defaultConfig } from '../config.js';
@@ -129,6 +129,7 @@ function registerIpcHandlers() {
     const formState = normalizeFormState(rawFormState);
     await savePreferences(app.getPath('userData'), {
       ...formState,
+      proxy: sanitizeProxyForStorage(formState.proxy),
       outputDir: userOutputDirectory ?? '',
     });
 
@@ -147,8 +148,32 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('scrape:open-output-folder', async () => {
-    await mkdir(getDesktopOutputDirectory(), { recursive: true });
-    const result = await shell.openPath(getDesktopOutputDirectory());
+    const dir = getDesktopOutputDirectory();
+
+    if (typeof dir !== 'string' || dir.trim().length === 0) {
+      throw new Error('Output directory path is empty.');
+    }
+
+    if (!path.isAbsolute(dir)) {
+      throw new Error('Output directory path must be absolute.');
+    }
+
+    try {
+      const dirStat = await stat(dir);
+      if (!dirStat.isDirectory()) {
+        throw new Error('Output path exists but is not a directory.');
+      }
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        // Directory doesn't exist yet (first launch or no scrape run yet).
+        // Create it so the user can open the folder even before any scrape.
+        await mkdir(dir, { recursive: true });
+      } else {
+        throw error;
+      }
+    }
+
+    const result = await shell.openPath(dir);
     if (result) {
       throw new Error(result);
     }
@@ -323,7 +348,7 @@ function buildRunConfig(formState) {
     browserChannel: formState.browserChannel,
     headless: !formState.headful,
     enrichWebsite: formState.enrichWebsite,
-    websitePageLimit: resolveDesktopWebsitePageLimit(),
+    websitePageLimit: formState.websitePageLimit,
     outputDir: getDesktopOutputDirectory(),
     allowBundledChromium: !app.isPackaged,
     concurrency: formState.concurrency,
@@ -431,16 +456,24 @@ async function pathExists(targetPath) {
   }
 }
 
+function sanitizeProxyForStorage(raw) {
+  if (!raw) return raw;
+  try {
+    const url = new URL(raw);
+    url.username = '';
+    url.password = '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
 function asPlainObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
   }
 
   return value;
-}
-
-function resolveDesktopWebsitePageLimit() {
-  return defaultConfig.websitePageLimit;
 }
 
 async function runSmokeScrape(runConfig) {
