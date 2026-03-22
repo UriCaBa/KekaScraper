@@ -184,37 +184,44 @@ function registerIpcHandlers() {
       title: 'Load previous results',
       defaultPath: getDesktopOutputDirectory(),
       filters: [{ name: 'JSON files', extensions: ['json'] }],
-      properties: ['openFile'],
+      properties: ['openFile', 'multiSelections'],
     });
 
     if (result.canceled || !result.filePaths.length) {
       return null;
     }
 
-    const filePath = result.filePaths[0];
-    const raw = await readFile(filePath, 'utf8');
-    let parsed;
+    const allItems = [];
+    const fileNames = [];
 
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      throw new Error('The selected file is not valid JSON.');
+    for (const filePath of result.filePaths) {
+      const raw = await readFile(filePath, 'utf8');
+      let parsed;
+
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+
+      if (!Array.isArray(parsed)) {
+        continue;
+      }
+
+      const items = parsed.filter((item) => item && typeof item === 'object' && !Array.isArray(item));
+      allItems.push(...items);
+      fileNames.push(path.basename(filePath));
     }
 
-    if (!Array.isArray(parsed)) {
-      throw new Error('The selected file does not contain a results array.');
-    }
-
-    const items = parsed.filter((item) => item && typeof item === 'object' && !Array.isArray(item));
-    if (items.length === 0) {
-      throw new Error('The selected file contains no valid result entries.');
+    if (allItems.length === 0) {
+      throw new Error('The selected files contain no valid result entries.');
     }
 
     return {
-      filePath,
-      fileName: path.basename(filePath),
-      results: items,
-      totalCount: items.length,
+      filePath: result.filePaths[0],
+      fileName: fileNames.length === 1 ? fileNames[0] : `${fileNames.length} files`,
+      results: allItems,
+      totalCount: allItems.length,
     };
   });
 

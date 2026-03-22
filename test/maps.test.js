@@ -4,6 +4,7 @@ import {
   buildSearchQueries,
   isEmptyListing,
   isLikelyHostel,
+  isRateLimitError,
   MAX_DETAIL_CONCURRENCY,
   scoreListingMatch,
 } from '../src/lib/maps.js';
@@ -146,6 +147,18 @@ export const tests = [
     run: () => {
       assert.equal(MAX_DETAIL_CONCURRENCY, 6);
       assert.equal(typeof MAX_DETAIL_CONCURRENCY, 'number');
+    },
+  },
+  {
+    name: 'isRateLimitError identifies Google rate-limit errors',
+    run: () => {
+      assert.equal(isRateLimitError(new Error('Google rate-limit detected: CAPTCHA present')), true);
+      assert.equal(isRateLimitError(new Error('Google rate-limit detected: unusual traffic warning')), true);
+      assert.equal(isRateLimitError(new Error('Google rate-limit detected: blank page')), true);
+      assert.equal(isRateLimitError(new Error('locator.waitFor: Timeout 15000ms exceeded')), false);
+      assert.equal(isRateLimitError(new Error('Navigation timeout')), false);
+      assert.equal(isRateLimitError(null), false);
+      assert.equal(isRateLimitError(undefined), false);
     },
   },
   {

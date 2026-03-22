@@ -27,6 +27,7 @@ const state = {
   dashSelectedIndex: -1,
   dashSearchQuery: '',
   dashFileName: '',
+  dashStatFilter: null,
 };
 
 const RESULTS_PREVIEW_LIMIT = 200;
@@ -182,6 +183,16 @@ async function bootstrap() {
     renderDashTable();
   });
 
+  // Dashboard: stat chip filter toggle
+  for (const chip of document.querySelectorAll('.stat-chip[data-filter]')) {
+    chip.addEventListener('click', () => {
+      const filter = chip.dataset.filter;
+      state.dashStatFilter = state.dashStatFilter === filter ? null : filter;
+      updateStatChipSelection();
+      renderDashTable();
+    });
+  }
+
   // Dashboard: back to table from detail view
   elements.detailClose.addEventListener('click', () => {
     closeDashDetail();
@@ -262,6 +273,10 @@ async function handleSubmit() {
     state.dashResults = state.results.filter((item) => !isEmptyListing(item));
     state.dashSelectedIndex = -1;
     state.dashFileName = '';
+    state.dashStatFilter = null;
+    state.dashSearchQuery = '';
+    elements.dashSearch.value = '';
+    updateStatChipSelection();
     renderDashboard();
     switchTab('dashboard');
   } catch (error) {
@@ -605,34 +620,74 @@ async function handleLoadResults() {
   }
 
   const filtered = data.results.filter((item) => !isEmptyListing(item));
-  state.dashResults = filtered.slice(0, DASH_ROW_LIMIT);
-  if (filtered.length > DASH_ROW_LIMIT) {
+
+  // Deduplicate by googleMapsUrl when loading multiple files
+  const seen = new Set();
+  const deduped = [];
+  for (const item of filtered) {
+    const key = item.googleMapsUrl || '';
+    if (key && seen.has(key)) {
+      continue;
+    }
+    if (key) {
+      seen.add(key);
+    }
+    deduped.push(item);
+  }
+
+  state.dashResults = deduped.slice(0, DASH_ROW_LIMIT);
+  if (deduped.length > DASH_ROW_LIMIT) {
     appendLog(
-      `Dashboard shows first ${DASH_ROW_LIMIT} of ${filtered.length} results. Open the exported file for the full dataset.`,
+      `Dashboard shows first ${DASH_ROW_LIMIT} of ${deduped.length} results. Open the exported file for the full dataset.`,
     );
     renderStatus();
   }
   state.dashSelectedIndex = -1;
   state.dashFileName = data.fileName;
   state.dashSearchQuery = '';
+  state.dashStatFilter = null;
   elements.dashSearch.value = '';
   elements.dashDetailContainer.hidden = true;
+  updateStatChipSelection();
   renderDashboard();
 }
 
+const STAT_FILTER_FNS = {
+  total: () => true,
+  withEmail: (r) => Boolean(r.generalEmail),
+  withPhone: (r) => Boolean(r.phone || r.websitePhone),
+  withDm: (r) => Boolean(r.decisionMakerName),
+  enriched: (r) => r.websiteScanStatus === 'ok',
+  withSocial: (r) => Boolean(r.instagramUrl || r.facebookUrl || r.linkedinUrl || r.twitterUrl),
+};
+
 function getFilteredDashResults() {
+  let results = state.dashResults;
+
+  if (state.dashStatFilter && STAT_FILTER_FNS[state.dashStatFilter]) {
+    results = results.filter(STAT_FILTER_FNS[state.dashStatFilter]);
+  }
+
   if (!state.dashSearchQuery) {
-    return state.dashResults;
+    return results;
   }
 
   const query = state.dashSearchQuery;
-  return state.dashResults.filter((item) => {
+  return results.filter((item) => {
     const haystack = [item.name, item.searchedCity, item.generalEmail, item.bestContactValue, item.website]
       .filter(Boolean)
       .join(' ')
       .toLowerCase();
     return haystack.includes(query);
   });
+}
+
+function updateStatChipSelection() {
+  for (const chip of document.querySelectorAll('.stat-chip[data-filter]')) {
+    const isActive = chip.dataset.filter === state.dashStatFilter;
+    chip.classList.toggle('stat-chip-active', isActive);
+    chip.setAttribute('aria-pressed', String(isActive));
+  }
 }
 
 function computeStats(results) {

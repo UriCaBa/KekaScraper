@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 
-import { buildCityCompletedPayload, determineOutcome, loadCheckpoint } from '../src/lib/run-scrape.js';
+import {
+  buildCityCompletedPayload,
+  determineOutcome,
+  loadCheckpoint,
+  loadPreviousResultUrls,
+} from '../src/lib/run-scrape.js';
 
 export const tests = [
   {
@@ -118,6 +123,131 @@ export const tests = [
         assert.deepEqual(result.completedCities, ['Barcelona', 'Madrid']);
         assert.equal(result.results.length, 2);
         assert.equal(result.runId, '20260321-143022');
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
+    name: 'loadPreviousResultUrls returns empty array for non-existent directory',
+    run: async () => {
+      const result = await loadPreviousResultUrls('/non/existent/path');
+      assert.deepEqual(result, []);
+    },
+  },
+  {
+    name: 'loadPreviousResultUrls extracts googleMapsUrl from hostels JSON files',
+    run: async () => {
+      const os = await import('node:os');
+      const fs = await import('node:fs/promises');
+      const tmpDir = await fs.mkdtemp(path.join(os.default.tmpdir(), 'keka-test-'));
+      try {
+        const results = [
+          { name: 'Hostal A', googleMapsUrl: 'https://www.google.com/maps/place/HostalA/' },
+          { name: 'Hostal B', googleMapsUrl: 'https://www.google.com/maps/place/HostalB/' },
+        ];
+        await fs.writeFile(path.join(tmpDir, 'hostels-20260322-100000.json'), JSON.stringify(results), 'utf8');
+
+        const urls = await loadPreviousResultUrls(tmpDir);
+        assert.equal(urls.length, 2);
+        assert.ok(urls.includes('https://www.google.com/maps/place/HostalA/'));
+        assert.ok(urls.includes('https://www.google.com/maps/place/HostalB/'));
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
+    name: 'loadPreviousResultUrls ignores checkpoint files and non-hostels JSON files',
+    run: async () => {
+      const os = await import('node:os');
+      const fs = await import('node:fs/promises');
+      const tmpDir = await fs.mkdtemp(path.join(os.default.tmpdir(), 'keka-test-'));
+      try {
+        await fs.writeFile(
+          path.join(tmpDir, '20260322-checkpoint.json'),
+          JSON.stringify([{ googleMapsUrl: 'https://maps.google.com/checkpoint' }]),
+          'utf8',
+        );
+        await fs.writeFile(
+          path.join(tmpDir, 'random-data.json'),
+          JSON.stringify([{ googleMapsUrl: 'https://maps.google.com/random' }]),
+          'utf8',
+        );
+
+        const urls = await loadPreviousResultUrls(tmpDir);
+        assert.equal(urls.length, 0);
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
+    name: 'loadPreviousResultUrls merges URLs from multiple hostels JSON files',
+    run: async () => {
+      const os = await import('node:os');
+      const fs = await import('node:fs/promises');
+      const tmpDir = await fs.mkdtemp(path.join(os.default.tmpdir(), 'keka-test-'));
+      try {
+        await fs.writeFile(
+          path.join(tmpDir, 'hostels-20260322-100000.json'),
+          JSON.stringify([{ name: 'A', googleMapsUrl: 'https://maps.google.com/A' }]),
+          'utf8',
+        );
+        await fs.writeFile(
+          path.join(tmpDir, 'hostels-20260322-110000.json'),
+          JSON.stringify([{ name: 'B', googleMapsUrl: 'https://maps.google.com/B' }]),
+          'utf8',
+        );
+
+        const urls = await loadPreviousResultUrls(tmpDir);
+        assert.equal(urls.length, 2);
+        assert.ok(urls.includes('https://maps.google.com/A'));
+        assert.ok(urls.includes('https://maps.google.com/B'));
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
+    name: 'loadPreviousResultUrls skips corrupted JSON files gracefully',
+    run: async () => {
+      const os = await import('node:os');
+      const fs = await import('node:fs/promises');
+      const tmpDir = await fs.mkdtemp(path.join(os.default.tmpdir(), 'keka-test-'));
+      try {
+        await fs.writeFile(path.join(tmpDir, 'hostels-20260322-100000.json'), 'not json', 'utf8');
+        await fs.writeFile(
+          path.join(tmpDir, 'hostels-20260322-110000.json'),
+          JSON.stringify([{ name: 'Valid', googleMapsUrl: 'https://maps.google.com/valid' }]),
+          'utf8',
+        );
+
+        const urls = await loadPreviousResultUrls(tmpDir);
+        assert.equal(urls.length, 1);
+        assert.ok(urls.includes('https://maps.google.com/valid'));
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
+    name: 'loadPreviousResultUrls skips items without googleMapsUrl',
+    run: async () => {
+      const os = await import('node:os');
+      const fs = await import('node:fs/promises');
+      const tmpDir = await fs.mkdtemp(path.join(os.default.tmpdir(), 'keka-test-'));
+      try {
+        const results = [
+          { name: 'No URL' },
+          { name: 'Has URL', googleMapsUrl: 'https://maps.google.com/has-url' },
+          { name: 'Null URL', googleMapsUrl: null },
+        ];
+        await fs.writeFile(path.join(tmpDir, 'hostels-20260322-100000.json'), JSON.stringify(results), 'utf8');
+
+        const urls = await loadPreviousResultUrls(tmpDir);
+        assert.equal(urls.length, 1);
+        assert.ok(urls.includes('https://maps.google.com/has-url'));
       } finally {
         await fs.rm(tmpDir, { recursive: true, force: true });
       }

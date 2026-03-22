@@ -91,6 +91,48 @@ const STREET_TOKENS = new Set([
 
 export const MAX_DETAIL_CONCURRENCY = 6;
 
+const RATE_LIMIT_BASE_COOLDOWN_MS = 30000;
+const RATE_LIMIT_MAX_COOLDOWN_MS = 120000;
+
+async function detectBlockage(page) {
+  // Check CAPTCHA iframe first — cheapest selector-based check.
+  if (
+    await page
+      .locator('iframe[src*="recaptcha"], iframe[src*="captcha"]')
+      .count()
+      .catch(() => 0)
+  ) {
+    throw new Error('Google rate-limit detected: CAPTCHA present');
+  }
+
+  // innerText is expensive on large DOMs — only fetch when needed.
+  const bodyText = await page
+    .locator('body')
+    .first()
+    .innerText({ timeout: 3000 })
+    .catch(() => '');
+
+  if (/unusual traffic|automated queries|sorry.*can.?t process/i.test(bodyText)) {
+    throw new Error('Google rate-limit detected: unusual traffic warning');
+  }
+
+  if (bodyText.trim().length < 50) {
+    await page.waitForTimeout(2000);
+    const retryText = await page
+      .locator('body')
+      .first()
+      .innerText({ timeout: 2000 })
+      .catch(() => '');
+    if (retryText.trim().length < 50) {
+      throw new Error('Google rate-limit detected: blank page');
+    }
+  }
+}
+
+export function isRateLimitError(error) {
+  return error?.message?.includes('Google rate-limit detected') === true;
+}
+
 export async function scrapeCity(page, detailPage, options) {
   const {
     city,
@@ -102,6 +144,7 @@ export async function scrapeCity(page, detailPage, options) {
     detailPauseMs,
     detailConcurrency = 1,
     coordinates,
+    excludeUrls = [],
     onEvent,
   } = options;
   const emit = typeof onEvent === 'function' ? onEvent : () => {};
@@ -110,6 +153,12 @@ export async function scrapeCity(page, detailPage, options) {
   const candidateLimit = Math.min(Math.max(resultLimit * 10, resultLimit + 32), candidateCap);
   const searchQueries = buildSearchQueries(queryPrefix, city);
   const seenListingUrls = new Map();
+
+  // Excluded URLs are tracked separately so they don't count toward candidateLimit
+  const excludedUrlKeys = new Set();
+  for (const url of excludeUrls) {
+    excludedUrlKeys.add(normalizeMapsUrl(url));
+  }
   const results = [];
   const stats = {
     queriesTried: 0,
@@ -119,6 +168,9 @@ export async function scrapeCity(page, detailPage, options) {
     listingsSkipped: 0,
     listingFailures: 0,
   };
+
+  // Shared rate-limit cooldown: when one worker detects a block, all workers pause.
+  const rateLimitState = { cooldownUntil: 0, consecutiveHits: 0 };
 
   const effectiveConcurrency = Math.min(Math.max(detailConcurrency, 1), MAX_DETAIL_CONCURRENCY);
   const context = page.context();
@@ -158,11 +210,12 @@ export async function scrapeCity(page, detailPage, options) {
       const newCandidates = [];
       for (const listingUrl of listingUrls) {
         const key = normalizeMapsUrl(listingUrl);
-        if (!seenListingUrls.has(key)) {
-          const candidate = { listingUrl, searchQuery };
-          seenListingUrls.set(key, candidate);
-          newCandidates.push(candidate);
+        if (excludedUrlKeys.has(key) || seenListingUrls.has(key)) {
+          continue;
         }
+        const candidate = { listingUrl, searchQuery };
+        seenListingUrls.set(key, candidate);
+        newCandidates.push(candidate);
 
         if (seenListingUrls.size >= candidateLimit) {
           break;
@@ -193,6 +246,11 @@ export async function scrapeCity(page, detailPage, options) {
         nextPoolSlot = (nextPoolSlot + 1) % pagePool.length;
         const workerPage = pagePool[poolSlot];
 
+        // Stagger the first batch so workers don't all hit Google simultaneously
+        if (candidateOffset < effectiveConcurrency && poolSlot > 0) {
+          await jitteredSleep(poolSlot * 600);
+        }
+
         const { listingUrl } = candidate;
         const candidateIndex = candidateBaseIndex + candidateOffset + 1;
         stats.listingsProcessed += 1;
@@ -205,18 +263,46 @@ export async function scrapeCity(page, detailPage, options) {
         });
 
         try {
-          const item = await retry(() => extractListing(workerPage, listingUrl, city, candidate.searchQuery), {
-            retries: retryCount,
-            delayMs: retryDelayMs,
-            label: `extract listing ${candidateIndex}`,
-            onEvent: emit,
-            eventContext: {
-              city,
-              index: candidateIndex,
-              totalListings: seenListingUrls.size,
-              listingUrl,
+          const item = await retry(
+            async () => {
+              // Honor shared cooldown: if another worker triggered it, wait
+              const waitMs = rateLimitState.cooldownUntil - Date.now();
+              if (waitMs > 0) {
+                await jitteredSleep(waitMs);
+              }
+
+              try {
+                return await extractListing(workerPage, listingUrl, city, candidate.searchQuery);
+              } catch (error) {
+                await workerPage.goto('about:blank').catch(() => {});
+                consentDismissedByPage.delete(workerPage);
+                if (isRateLimitError(error)) {
+                  rateLimitState.consecutiveHits += 1;
+                  const cooldown = Math.min(
+                    RATE_LIMIT_BASE_COOLDOWN_MS * 2 ** (rateLimitState.consecutiveHits - 1),
+                    RATE_LIMIT_MAX_COOLDOWN_MS,
+                  );
+                  rateLimitState.cooldownUntil = Date.now() + cooldown;
+                }
+                throw error;
+              }
             },
-          });
+            {
+              retries: retryCount,
+              delayMs: retryDelayMs,
+              label: `extract listing ${candidateIndex}`,
+              onEvent: emit,
+              eventContext: {
+                city,
+                index: candidateIndex,
+                totalListings: seenListingUrls.size,
+                listingUrl,
+              },
+            },
+          );
+
+          // Successful extraction: reset rate-limit escalation
+          rateLimitState.consecutiveHits = 0;
 
           if (isEmptyListing(item)) {
             stats.listingsSkipped += 1;
@@ -265,6 +351,8 @@ export async function scrapeCity(page, detailPage, options) {
             listingUrl,
             message: error?.message ?? String(error),
           });
+          await workerPage.goto('about:blank').catch(() => {});
+          consentDismissedByPage.delete(workerPage);
           await jitteredSleep(detailPauseMs);
         }
       });
@@ -301,11 +389,10 @@ async function waitForResultsOrDetails(page) {
   });
 }
 
-const consentDismissedByContext = new WeakMap();
+const consentDismissedByPage = new WeakMap();
 
 async function dismissConsentIfPresent(page) {
-  const ctx = page.context();
-  if (consentDismissedByContext.get(ctx)) {
+  if (consentDismissedByPage.get(page)) {
     return;
   }
 
@@ -344,7 +431,7 @@ async function dismissConsentIfPresent(page) {
   }
 
   if (dismissed > 0) {
-    consentDismissedByContext.set(ctx, true);
+    consentDismissedByPage.set(page, true);
   }
 }
 
@@ -467,6 +554,7 @@ async function waitForScrollContent(page) {
 async function extractListing(page, listingUrl, city, searchQuery) {
   await page.goto(listingUrl, { waitUntil: 'domcontentloaded' });
   await dismissConsentIfPresent(page);
+  await detectBlockage(page);
   await page.locator('h1').first().waitFor({ state: 'visible', timeout: 15000 });
   await waitForListingSignals(page);
 
