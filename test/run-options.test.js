@@ -186,4 +186,29 @@ export const tests = [
       assert.equal(result.resume, false);
     },
   },
+  {
+    name: 'normalizeRunOptions throws when resultLimit exceeds max of 400',
+    run: () => {
+      assert.throws(
+        () => normalizeRunOptions({ cities: 'Barcelona', resultLimit: 500 }, { requireCities: true }),
+        /integer <= 400/,
+      );
+    },
+  },
+  {
+    name: 'normalizeRunOptions accepts resultLimit at boundary of 400',
+    run: () => {
+      const result = normalizeRunOptions({ cities: 'Barcelona', resultLimit: 400 }, { requireCities: true });
+      assert.equal(result.resultLimit, 400);
+    },
+  },
+  {
+    name: 'normalizeRunOptions throws when detailConcurrency exceeds max of 6',
+    run: () => {
+      assert.throws(
+        () => normalizeRunOptions({ cities: 'Barcelona', detailConcurrency: 7 }, { requireCities: true }),
+        /integer <= 6/,
+      );
+    },
+  },
 ];

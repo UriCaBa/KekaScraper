@@ -19,7 +19,7 @@ export function normalizeRunOptions(input = {}, { requireCities = true } = {}) {
     cities,
     formats,
     browserChannel: normalizeBrowserChannel(input.browserChannel ?? defaultConfig.browserChannel),
-    resultLimit: normalizeInteger(input.resultLimit, defaultConfig.resultLimit, 'resultLimit'),
+    resultLimit: normalizeInteger(input.resultLimit, defaultConfig.resultLimit, 'resultLimit', { max: 400 }),
     slowMo: normalizeInteger(input.slowMo, defaultConfig.slowMo, 'slowMo', { min: 0 }),
     maxScrollRounds: normalizeInteger(input.maxScrollRounds, defaultConfig.maxScrollRounds, 'maxScrollRounds'),
     websitePageLimit: normalizeInteger(input.websitePageLimit, defaultConfig.websitePageLimit, 'websitePageLimit'),
@@ -47,7 +47,7 @@ export function normalizeRunOptions(input = {}, { requireCities = true } = {}) {
     proxy: normalizeProxy(input),
     resume: normalizeBoolean(input.resume, false),
     concurrency: normalizeInteger(input.concurrency, 1, 'concurrency', { min: 1 }),
-    detailConcurrency: normalizeInteger(input.detailConcurrency, 1, 'detailConcurrency', { min: 1 }),
+    detailConcurrency: normalizeInteger(input.detailConcurrency, 1, 'detailConcurrency', { min: 1, max: 6 }),
   };
 }
 
@@ -61,7 +61,7 @@ export function normalizeBrowserChannel(value, flagName = 'browserChannel') {
 }
 
 export function normalizeInteger(value, defaultValue, flagName, options = {}) {
-  const { min = 1 } = options;
+  const { min = 1, max } = options;
 
   if (value === undefined || value === null || value === '') {
     return defaultValue;
@@ -70,6 +70,10 @@ export function normalizeInteger(value, defaultValue, flagName, options = {}) {
   const parsed = Number.parseInt(value, 10);
   if (Number.isNaN(parsed) || parsed < min) {
     throw new Error(`Expected an integer >= ${min} for ${flagName}, got "${value}"`);
+  }
+
+  if (max != null && parsed > max) {
+    throw new Error(`Expected an integer <= ${max} for ${flagName}, got "${value}"`);
   }
 
   return parsed;

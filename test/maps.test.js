@@ -142,9 +142,9 @@ export const tests = [
     },
   },
   {
-    name: 'MAX_DETAIL_CONCURRENCY is capped at 3',
+    name: 'MAX_DETAIL_CONCURRENCY is capped at 6',
     run: () => {
-      assert.equal(MAX_DETAIL_CONCURRENCY, 3);
+      assert.equal(MAX_DETAIL_CONCURRENCY, 6);
       assert.equal(typeof MAX_DETAIL_CONCURRENCY, 'number');
     },
   },
@@ -157,8 +157,10 @@ export const tests = [
       assert.equal(clamp(1), 1);
       assert.equal(clamp(2), 2);
       assert.equal(clamp(3), 3);
-      assert.equal(clamp(5), 3, 'values above MAX are clamped to MAX_DETAIL_CONCURRENCY');
-      assert.equal(clamp(100), 3);
+      assert.equal(clamp(5), 5);
+      assert.equal(clamp(6), 6);
+      assert.equal(clamp(7), 6, 'values above MAX are clamped to MAX_DETAIL_CONCURRENCY');
+      assert.equal(clamp(100), 6);
     },
   },
 ];

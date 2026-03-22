@@ -88,6 +88,21 @@ export const tests = [
     },
   },
   {
+    name: 'writeOutputs CSV starts with UTF-8 BOM for Windows Excel compatibility',
+    run: async () => {
+      const tmpDir = await makeTempDir();
+      try {
+        const items = [{ name: 'Hostal Niño', city: 'Logroño' }];
+        await writeOutputs(items, { outputDir: tmpDir, baseFilename: 'bom', formats: ['csv'] });
+        const raw = await fs.readFile(path.join(tmpDir, 'bom.csv'), 'utf8');
+        assert.ok(raw.startsWith('\uFEFF'), 'CSV should start with UTF-8 BOM');
+        assert.ok(raw.includes('Hostal Niño'), 'CSV should preserve special characters');
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
     name: 'writeOutputs creates output directory if it does not exist',
     run: async () => {
       const tmpDir = await makeTempDir();

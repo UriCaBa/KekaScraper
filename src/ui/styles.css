@@ -189,6 +189,10 @@ textarea {
   line-height: 1.45;
 }
 
+.field small.warning {
+  color: var(--warning);
+}
+
 textarea,
 input,
 select {
